@@ -1,0 +1,17 @@
+crawler:
+  raw-data-dir: ${java.io.tmpdir}/crawler-test-data/
+  discovery-max-pages: 5
+  extraction-batch-size: 5
+  renderer-base-url: http://localhost:${wiremock.server.port:18080}
+  retry-max-retries: 3
+  retry-interval-ms: 600000
+
+spring:
+  batch:
+    job:
+      enabled: false
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: none
