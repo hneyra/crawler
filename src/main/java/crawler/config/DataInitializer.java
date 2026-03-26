@@ -52,6 +52,7 @@ public class DataInitializer implements CommandLineRunner {
             site.setBaseUrl(siteDef.getBaseUrl());
             site.setEnabled(siteDef.isEnabled());
             site.setPolitenessDelayMs(siteDef.getPolitenessDelayMs());
+            site.setExtractionConfig(siteDef.getExtractionConfig());
             site.setCreatedAt(Instant.now());
             site = siteRepository.save(site);
             log.info("Created site '{}'", site.getName());
@@ -63,6 +64,7 @@ public class DataInitializer implements CommandLineRunner {
                 category.setUrl(catDef.getUrl());
                 category.setPaginationType(catDef.getPaginationType());
                 category.setItemLinkSelector(catDef.getItemLinkSelector());
+                category.setNextPageSelector(catDef.getNextPageSelector());
                 category.setEnabled(catDef.isEnabled());
                 categoryRepository.save(category);
                 log.info("  Created category '{}'", category.getName());
@@ -84,6 +86,18 @@ public class DataInitializer implements CommandLineRunner {
                     baseUrl: https://ejemplo.com
                     enabled: true
                     politenessDelayMs: 1000
+                    extractionConfig:
+                      detailStrategy: HTML
+                      fieldSelectors:
+                        title: "h1.product-title"
+                        price: "span.price"
+                        description: "div.product-description"
+                      scriptPatterns:
+                        - "__NEXT_DATA__\\s*=\\s*(\\{.*?\\});?"
+                        - "window\\.__INITIAL_STATE__\\s*=\\s*(\\{.*?\\});?"
+                      jsonPaths:
+                        productName: "$.props.pageProps.product.name"
+                        productPrice: "$.props.pageProps.product.price"
                     categories:
                       - name: Celulares
                         url: https://ejemplo.com/celulares

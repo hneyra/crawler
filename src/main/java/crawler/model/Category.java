@@ -37,6 +37,9 @@ public class Category {
     @Column(name = "item_link_selector", nullable = false)
     private String itemLinkSelector;
 
+    @Column(name = "next_page_selector")
+    private String nextPageSelector;
+
     @Column(nullable = false)
     private boolean enabled;
 
@@ -86,6 +89,14 @@ public class Category {
 
     public void setItemLinkSelector(String itemLinkSelector) {
         this.itemLinkSelector = itemLinkSelector;
+    }
+
+    public String getNextPageSelector() {
+        return nextPageSelector;
+    }
+
+    public void setNextPageSelector(String nextPageSelector) {
+        this.nextPageSelector = nextPageSelector;
     }
 
     public boolean isEnabled() {

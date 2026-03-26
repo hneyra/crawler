@@ -1,5 +1,6 @@
 package crawler.config;
 
+import crawler.model.ExtractionConfig;
 import java.util.List;
 
 public class SiteDefinition {
@@ -8,6 +9,7 @@ public class SiteDefinition {
     private String baseUrl;
     private boolean enabled = true;
     private int politenessDelayMs = 1000;
+    private ExtractionConfig extractionConfig;
     private List<CategoryDefinition> categories = List.of();
 
     public String getName() {
@@ -40,6 +42,14 @@ public class SiteDefinition {
 
     public void setPolitenessDelayMs(int politenessDelayMs) {
         this.politenessDelayMs = politenessDelayMs;
+    }
+
+    public ExtractionConfig getExtractionConfig() {
+        return extractionConfig;
+    }
+
+    public void setExtractionConfig(ExtractionConfig extractionConfig) {
+        this.extractionConfig = extractionConfig;
     }
 
     public List<CategoryDefinition> getCategories() {

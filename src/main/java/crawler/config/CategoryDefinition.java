@@ -8,6 +8,7 @@ public class CategoryDefinition {
     private String url;
     private PaginationType paginationType = PaginationType.PAGE_PARAM;
     private String itemLinkSelector;
+    private String nextPageSelector;
     private boolean enabled = true;
 
     public String getName() {
@@ -40,6 +41,14 @@ public class CategoryDefinition {
 
     public void setItemLinkSelector(String itemLinkSelector) {
         this.itemLinkSelector = itemLinkSelector;
+    }
+
+    public String getNextPageSelector() {
+        return nextPageSelector;
+    }
+
+    public void setNextPageSelector(String nextPageSelector) {
+        this.nextPageSelector = nextPageSelector;
     }
 
     public boolean isEnabled() {

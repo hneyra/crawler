@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "site")
@@ -27,6 +29,10 @@ public class Site {
 
     @Column(name = "politeness_delay_ms", nullable = false)
     private int politenessDelayMs;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "extraction_config", columnDefinition = "jsonb")
+    private ExtractionConfig extractionConfig;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -69,6 +75,14 @@ public class Site {
 
     public void setPolitenessDelayMs(int politenessDelayMs) {
         this.politenessDelayMs = politenessDelayMs;
+    }
+
+    public ExtractionConfig getExtractionConfig() {
+        return extractionConfig;
+    }
+
+    public void setExtractionConfig(ExtractionConfig extractionConfig) {
+        this.extractionConfig = extractionConfig;
     }
 
     public Instant getCreatedAt() {

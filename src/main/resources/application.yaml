@@ -26,4 +26,7 @@ spring:
       initialize-schema: always
 
 crawler:
-  raw-data-dir: ${user.home}/crawler-data/
+#  raw-data-dir: ${user.home}/crawler-data/
+  raw-data-dir: E:/crawler-data/
+  discovery-max-pages: 50
+  extraction-batch-size: 10
