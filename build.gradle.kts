@@ -1,0 +1,51 @@
+plugins {
+    java
+    id("org.springframework.boot") version "4.0.5"
+    id("io.spring.dependency-management") version "1.1.7"
+}
+
+group = "crawler"
+version = "0.0.1-SNAPSHOT"
+description = "crawler"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Batch
+    implementation("org.springframework.boot:spring-boot-starter-batch")
+
+    // Spring Data JPA + PostgreSQL
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    runtimeOnly("org.postgresql:postgresql")
+
+    // Flyway
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
+    // WebClient (Spring WebFlux)
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+
+    // Jsoup (HTML parsing)
+    implementation("org.jsoup:jsoup:1.18.3")
+
+    // Jackson
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+
+    // Test
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.batch:spring-batch-test")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
