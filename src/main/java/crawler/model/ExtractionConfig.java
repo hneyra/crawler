@@ -9,6 +9,7 @@ public class ExtractionConfig {
     private Map<String, String> fieldSelectors = Map.of();
     private List<String> scriptPatterns = List.of();
     private Map<String, String> jsonPaths = Map.of();
+    private List<String> interceptPatterns = List.of();
 
     public DetailStrategy getDetailStrategy() {
         return detailStrategy;
@@ -40,6 +41,14 @@ public class ExtractionConfig {
 
     public void setJsonPaths(Map<String, String> jsonPaths) {
         this.jsonPaths = jsonPaths;
+    }
+
+    public List<String> getInterceptPatterns() {
+        return interceptPatterns;
+    }
+
+    public void setInterceptPatterns(List<String> interceptPatterns) {
+        this.interceptPatterns = interceptPatterns;
     }
 
 }

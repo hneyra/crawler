@@ -11,5 +11,14 @@ services:
     volumes:
       - crawler-pgdata:/var/lib/postgresql/data
 
+  renderer:
+    build: ./renderer
+    container_name: crawler-renderer
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DEFAULT_TIMEOUT: "30000"
+
 volumes:
   crawler-pgdata:

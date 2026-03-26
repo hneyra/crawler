@@ -3,10 +3,13 @@ package crawler.extraction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import crawler.config.CrawlerProperties;
+import crawler.discovery.PlaywrightClient;
+import crawler.discovery.PlaywrightClient.InterceptedResponse;
+import crawler.discovery.PlaywrightClient.RenderRequest;
+import crawler.discovery.PlaywrightClient.RenderResponse;
 import crawler.model.DetailStrategy;
 import crawler.model.DiscoveredUrl;
 import crawler.model.DiscoveredUrlRepository;
@@ -43,19 +46,22 @@ public class DetailExtractionService {
     private final RawStorageService rawStorageService;
     private final CrawlerProperties crawlerProperties;
     private final ObjectMapper objectMapper;
+    private final PlaywrightClient playwrightClient;
 
     public DetailExtractionService(DiscoveredUrlRepository discoveredUrlRepository,
                                    ExtractedItemRepository extractedItemRepository,
                                    SiteRepository siteRepository,
                                    RawStorageService rawStorageService,
                                    CrawlerProperties crawlerProperties,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   PlaywrightClient playwrightClient) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.extractedItemRepository = extractedItemRepository;
         this.siteRepository = siteRepository;
         this.rawStorageService = rawStorageService;
         this.crawlerProperties = crawlerProperties;
         this.objectMapper = objectMapper;
+        this.playwrightClient = playwrightClient;
     }
 
     public void processBatch(Long siteId) {
@@ -75,7 +81,6 @@ public class DetailExtractionService {
             return;
         }
 
-        // Mark all as IN_PROGRESS
         for (DiscoveredUrl url : batch) {
             url.setStatus(UrlStatus.IN_PROGRESS);
             url.setLastAttemptAt(Instant.now());
@@ -86,11 +91,16 @@ public class DetailExtractionService {
 
         ExtractionConfig config = site.getExtractionConfig();
         int politenessDelayMs = site.getPolitenessDelayMs();
+        boolean useAjax = config != null && config.getDetailStrategy() == DetailStrategy.AJAX;
 
         for (int i = 0; i < batch.size(); i++) {
             DiscoveredUrl discovered = batch.get(i);
             try {
-                processUrl(discovered, site, config);
+                if (useAjax) {
+                    processUrlWithPlaywright(discovered, site, config);
+                } else {
+                    processUrlWithJsoup(discovered, site, config);
+                }
                 discovered.setStatus(UrlStatus.COMPLETED);
                 log.info("Extracted: {}", discovered.getUrl());
             } catch (Exception e) {
@@ -107,19 +117,16 @@ public class DetailExtractionService {
         }
     }
 
-    private void processUrl(DiscoveredUrl discovered, Site site,
-                            ExtractionConfig config) throws Exception {
+    private void processUrlWithJsoup(DiscoveredUrl discovered, Site site,
+                                      ExtractionConfig config) throws Exception {
         Document doc = Jsoup.connect(discovered.getUrl())
                 .userAgent("CrawlerBot/1.0")
                 .timeout(15_000)
                 .get();
 
         String html = doc.outerHtml();
-
-        // Save raw HTML
         String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
 
-        // Extract properties
         Map<String, Object> properties = new LinkedHashMap<>();
 
         if (config != null) {
@@ -133,16 +140,66 @@ public class DetailExtractionService {
                 extractFromScripts(doc, config, properties);
             }
 
-            // Always try JSON-LD regardless of strategy
             extractJsonLd(doc, config, properties);
         }
 
-        // Determine title
+        saveExtractedItem(discovered, site, doc, properties, snapshotPath);
+    }
+
+    private void processUrlWithPlaywright(DiscoveredUrl discovered, Site site,
+                                           ExtractionConfig config) throws Exception {
+        List<String> interceptPatterns = config.getInterceptPatterns();
+
+        RenderRequest request = RenderRequest.withIntercept(
+                discovered.getUrl(), interceptPatterns, null, 30_000);
+
+        RenderResponse response = playwrightClient.render(request);
+
+        String html = response.html();
+        String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
+
+        // Also save intercepted JSON responses
+        for (InterceptedResponse intercepted : response.interceptedResponses()) {
+            rawStorageService.saveJson(intercepted.body(), site.getId(),
+                    discovered.getUrl() + "#intercepted-" + intercepted.url());
+        }
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+
+        // Extract from rendered HTML
+        Document doc = Jsoup.parse(html, discovered.getUrl());
+        if (config.getFieldSelectors() != null && !config.getFieldSelectors().isEmpty()) {
+            extractFromHtml(doc, config.getFieldSelectors(), properties);
+        }
+
+        // Extract from intercepted JSON responses via JsonPath
+        for (InterceptedResponse intercepted : response.interceptedResponses()) {
+            if (config.getJsonPaths() != null) {
+                extractWithJsonPaths(intercepted.body(), config.getJsonPaths(), properties);
+            }
+
+            // Store raw intercepted data under a keyed entry
+            try {
+                JsonNode node = objectMapper.readTree(intercepted.body());
+                properties.put("ajax_" + intercepted.status() + "_"
+                        + sanitizeKey(intercepted.url()), node);
+            } catch (JsonProcessingException e) {
+                log.debug("Non-JSON intercepted response from {}", intercepted.url());
+            }
+        }
+
+        extractJsonLd(doc, config, properties);
+
+        saveExtractedItem(discovered, site, doc, properties, snapshotPath);
+    }
+
+    private void saveExtractedItem(DiscoveredUrl discovered, Site site,
+                                    Document doc, Map<String, Object> properties,
+                                    String snapshotPath) throws JsonProcessingException {
         String title = properties.containsKey("title")
                 ? properties.get("title").toString()
                 : doc.title();
 
-        // Save extracted item
         ExtractedItem item = new ExtractedItem();
         item.setDiscoveredUrl(discovered);
         item.setSite(site);
@@ -221,11 +278,16 @@ public class DetailExtractionService {
                 Object value = JsonPath.read(json, entry.getValue());
                 properties.put(entry.getKey(), value);
             } catch (PathNotFoundException e) {
-                // path not found in this JSON block, skip
+                // path not found in this JSON block
             } catch (Exception e) {
                 log.debug("JsonPath error for '{}': {}", entry.getKey(), e.getMessage());
             }
         }
+    }
+
+    private static String sanitizeKey(String url) {
+        return url.replaceAll("[^a-zA-Z0-9]", "_");
+
     }
 
     private void sleep(int millis) {

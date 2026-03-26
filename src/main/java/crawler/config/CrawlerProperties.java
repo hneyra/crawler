@@ -10,6 +10,7 @@ public class CrawlerProperties {
     private String rawDataDir;
     private int discoveryMaxPages = 50;
     private int extractionBatchSize = 10;
+    private String rendererBaseUrl = "http://localhost:3000";
 
     public String getRawDataDir() {
         return rawDataDir;
@@ -33,6 +34,14 @@ public class CrawlerProperties {
 
     public void setExtractionBatchSize(int extractionBatchSize) {
         this.extractionBatchSize = extractionBatchSize;
+    }
+
+    public String getRendererBaseUrl() {
+        return rendererBaseUrl;
+    }
+
+    public void setRendererBaseUrl(String rendererBaseUrl) {
+        this.rendererBaseUrl = rendererBaseUrl;
     }
 
 }
