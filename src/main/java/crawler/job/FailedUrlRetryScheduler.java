@@ -22,7 +22,7 @@ public class FailedUrlRetryScheduler {
         this.crawlerProperties = crawlerProperties;
     }
 
-    @Scheduled(fixedDelayString = "#{${crawler.retry-interval-minutes} * 60 * 1000}")
+    @Scheduled(fixedDelayString = "${crawler.retry-interval-ms}")
     @Transactional
     public void retryFailedUrls() {
         int maxRetries = crawlerProperties.getRetryMaxRetries();

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ide__getDiagnostics",
+      "Bash(./gradlew dependencies:*)",
+      "Bash(jar tf:*)",
+      "Bash(grep -v '\\\\$')",
+      "Bash(grep '\\\\.class$')",
+      "Bash(find ~/.gradle/caches -path */spring-batch-infrastructure/6.0.3/*.jar -name *.jar ! -name *sources*)",
+      "Bash(./gradlew compileJava)",
+      "Bash(./gradlew compileTestJava)"
+    ]
+  }
+}

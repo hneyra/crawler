@@ -12,7 +12,7 @@ public class CrawlerProperties {
     private int extractionBatchSize = 10;
     private String rendererBaseUrl = "http://localhost:3000";
     private int retryMaxRetries = 3;
-    private long retryIntervalMinutes = 10;
+    private long retryIntervalMs = 600000;
 
     public String getRawDataDir() {
         return rawDataDir;
@@ -54,12 +54,12 @@ public class CrawlerProperties {
         this.retryMaxRetries = retryMaxRetries;
     }
 
-    public long getRetryIntervalMinutes() {
-        return retryIntervalMinutes;
+    public long getRetryIntervalMs() {
+        return retryIntervalMs;
     }
 
-    public void setRetryIntervalMinutes(long retryIntervalMinutes) {
-        this.retryIntervalMinutes = retryIntervalMinutes;
+    public void setRetryIntervalMs(long retryIntervalMs) {
+        this.retryIntervalMs = retryIntervalMs;
     }
 
 }
