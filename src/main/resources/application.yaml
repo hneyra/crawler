@@ -25,9 +25,15 @@ spring:
     jdbc:
       initialize-schema: always
 
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [siteId=%X{siteId:-} categoryId=%X{categoryId:-} url=%X{url:-}] %logger{36} - %msg%n"
+
 crawler:
 #  raw-data-dir: ${user.home}/crawler-data/
   raw-data-dir: E:/crawler-data/
   discovery-max-pages: 50
   extraction-batch-size: 10
   renderer-base-url: http://localhost:3000
+  retry-max-retries: 3
+  retry-interval-minutes: 10

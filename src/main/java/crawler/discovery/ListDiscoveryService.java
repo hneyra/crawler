@@ -18,6 +18,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,10 +39,17 @@ public class ListDiscoveryService {
     }
 
     public void discoverCategory(Category category) {
-        if (category.getPaginationType() == PaginationType.SCROLL_AJAX) {
-            discoverWithPlaywright(category);
-        } else {
-            discoverWithJsoup(category);
+        MDC.put("siteId", String.valueOf(category.getSite().getId()));
+        MDC.put("categoryId", String.valueOf(category.getId()));
+        try {
+            if (category.getPaginationType() == PaginationType.SCROLL_AJAX) {
+                discoverWithPlaywright(category);
+            } else {
+                discoverWithJsoup(category);
+            }
+        } finally {
+            MDC.remove("siteId");
+            MDC.remove("categoryId");
         }
     }
 
@@ -59,6 +67,7 @@ public class ListDiscoveryService {
 
         while (currentUrl != null && pagesVisited < maxPages) {
             pagesVisited++;
+            MDC.put("url", currentUrl);
 
             Document doc;
             try {
@@ -67,8 +76,7 @@ public class ListDiscoveryService {
                         .timeout(15_000)
                         .get();
             } catch (Exception e) {
-                log.error("Failed to fetch page {} for category '{}': {}",
-                        currentUrl, categoryName, e.getMessage());
+                log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage());
                 break;
             }
 
@@ -83,6 +91,7 @@ public class ListDiscoveryService {
             }
         }
 
+        MDC.remove("url");
         log.info("Discovery complete for category '{}': pages={}, newUrls={}, knownUrls={}",
                 categoryName, pagesVisited, newUrls, knownUrls);
     }
@@ -91,6 +100,7 @@ public class ListDiscoveryService {
         String categoryName = category.getName();
         int maxScrolls = crawlerProperties.getDiscoveryMaxPages();
 
+        MDC.put("url", category.getUrl());
         log.info("Starting Playwright scroll discovery for category '{}', url={}",
                 categoryName, category.getUrl());
 
@@ -104,6 +114,8 @@ public class ListDiscoveryService {
             log.error("Playwright render failed for category '{}': {}",
                     categoryName, e.getMessage());
             return;
+        } finally {
+            MDC.remove("url");
         }
 
         Document doc = Jsoup.parse(response.html(), category.getUrl());

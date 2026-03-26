@@ -32,6 +32,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -87,33 +88,42 @@ public class DetailExtractionService {
         }
         discoveredUrlRepository.saveAll(batch);
 
-        log.info("Processing batch of {} URLs for site '{}'", batch.size(), site.getName());
+        MDC.put("siteId", String.valueOf(siteId));
+        try {
+            log.info("Processing batch of {} URLs for site '{}'", batch.size(), site.getName());
 
-        ExtractionConfig config = site.getExtractionConfig();
-        int politenessDelayMs = site.getPolitenessDelayMs();
-        boolean useAjax = config != null && config.getDetailStrategy() == DetailStrategy.AJAX;
+            ExtractionConfig config = site.getExtractionConfig();
+            int politenessDelayMs = site.getPolitenessDelayMs();
+            boolean useAjax = config != null && config.getDetailStrategy() == DetailStrategy.AJAX;
 
-        for (int i = 0; i < batch.size(); i++) {
-            DiscoveredUrl discovered = batch.get(i);
-            try {
-                if (useAjax) {
-                    processUrlWithPlaywright(discovered, site, config);
-                } else {
-                    processUrlWithJsoup(discovered, site, config);
+            for (int i = 0; i < batch.size(); i++) {
+                DiscoveredUrl discovered = batch.get(i);
+                MDC.put("categoryId", String.valueOf(discovered.getCategory().getId()));
+                MDC.put("url", discovered.getUrl());
+                try {
+                    if (useAjax) {
+                        processUrlWithPlaywright(discovered, site, config);
+                    } else {
+                        processUrlWithJsoup(discovered, site, config);
+                    }
+                    discovered.setStatus(UrlStatus.COMPLETED);
+                    log.info("Extracted successfully");
+                } catch (Exception e) {
+                    discovered.setStatus(UrlStatus.FAILED);
+                    discovered.setRetryCount(discovered.getRetryCount() + 1);
+                    log.error("Extraction failed: {}", e.getMessage());
                 }
-                discovered.setStatus(UrlStatus.COMPLETED);
-                log.info("Extracted: {}", discovered.getUrl());
-            } catch (Exception e) {
-                discovered.setStatus(UrlStatus.FAILED);
-                discovered.setRetryCount(discovered.getRetryCount() + 1);
-                log.error("Failed to extract {}: {}", discovered.getUrl(), e.getMessage());
-            }
-            discovered.setLastAttemptAt(Instant.now());
-            discoveredUrlRepository.save(discovered);
+                discovered.setLastAttemptAt(Instant.now());
+                discoveredUrlRepository.save(discovered);
 
-            if (i < batch.size() - 1) {
-                sleep(politenessDelayMs);
+                if (i < batch.size() - 1) {
+                    sleep(politenessDelayMs);
+                }
             }
+        } finally {
+            MDC.remove("siteId");
+            MDC.remove("categoryId");
+            MDC.remove("url");
         }
     }
 

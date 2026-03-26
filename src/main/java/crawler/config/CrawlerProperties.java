@@ -11,6 +11,8 @@ public class CrawlerProperties {
     private int discoveryMaxPages = 50;
     private int extractionBatchSize = 10;
     private String rendererBaseUrl = "http://localhost:3000";
+    private int retryMaxRetries = 3;
+    private long retryIntervalMinutes = 10;
 
     public String getRawDataDir() {
         return rawDataDir;
@@ -42,6 +44,22 @@ public class CrawlerProperties {
 
     public void setRendererBaseUrl(String rendererBaseUrl) {
         this.rendererBaseUrl = rendererBaseUrl;
+    }
+
+    public int getRetryMaxRetries() {
+        return retryMaxRetries;
+    }
+
+    public void setRetryMaxRetries(int retryMaxRetries) {
+        this.retryMaxRetries = retryMaxRetries;
+    }
+
+    public long getRetryIntervalMinutes() {
+        return retryIntervalMinutes;
+    }
+
+    public void setRetryIntervalMinutes(long retryIntervalMinutes) {
+        this.retryIntervalMinutes = retryIntervalMinutes;
     }
 
 }
