@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawler Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 20px; color: #333; }
+        h1 { margin-bottom: 20px; }
+        h2 { margin: 20px 0 10px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 20px; }
+        th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; font-size: 14px; }
+        th { background: #333; color: #fff; }
+        tr:hover { background: #f0f0f0; }
+        button {
+            padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+            font-size: 13px; color: #fff; background: #2563eb;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn-refresh { background: #059669; }
+        .btn-refresh:hover { background: #047857; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .site-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; }
+        .site-card h3 { margin-bottom: 8px; }
+        .site-card .url { color: #666; font-size: 13px; margin-bottom: 10px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+        .stat-row .label { color: #666; }
+        .stat-row .value { font-weight: 600; }
+        .actions { margin-top: 10px; display: flex; gap: 8px; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff;
+            padding: 12px 20px; border-radius: 6px; font-size: 14px; display: none;
+        }
+        .props-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #666; }
+        #items-filter { margin-bottom: 10px; }
+        #items-filter select { padding: 4px 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>Crawler Dashboard</h1>
+
+    <div style="margin-bottom: 16px;">
+        <button class="btn-refresh" onclick="loadAll()">Refrescar</button>
+    </div>
+
+    <h2>Sitios</h2>
+    <div id="sites-grid" class="stats-grid"></div>
+
+    <h2>Items Extraidos</h2>
+    <div id="items-filter">
+        <label>Filtrar por sitio:
+            <select id="site-filter" onchange="loadItems()">
+                <option value="">Todos</option>
+            </select>
+        </label>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Titulo</th>
+                <th>URL</th>
+                <th>Sitio</th>
+                <th>Extraido</th>
+                <th>Propiedades</th>
+            </tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+    </table>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let allSites = [];
+
+        async function loadAll() {
+            await loadSites();
+            await loadItems();
+        }
+
+        async function loadSites() {
+            const res = await fetch('/api/stats/sites');
+            allSites = await res.json();
+
+            const filter = document.getElementById('site-filter');
+            filter.innerHTML = '<option value="">Todos</option>';
+            allSites.forEach(s => {
+                filter.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+
+            const grid = document.getElementById('sites-grid');
+            grid.innerHTML = '';
+
+            for (const site of allSites) {
+                const statsRes = await fetch(`/api/stats/site/${site.id}`);
+                const stats = await statsRes.json();
+
+                const card = document.createElement('div');
+                card.className = 'site-card';
+                card.innerHTML = `
+                    <h3>${esc(site.name)}</h3>
+                    <div class="url">${esc(site.baseUrl)}</div>
+                    <div class="stat-row"><span class="label">Total URLs</span><span class="value">${stats.totalUrls}</span></div>
+                    <div class="stat-row"><span class="label">Pendientes</span><span class="value">${stats.pending}</span></div>
+                    <div class="stat-row"><span class="label">En progreso</span><span class="value">${stats.inProgress}</span></div>
+                    <div class="stat-row"><span class="label">Completadas</span><span class="value">${stats.completed}</span></div>
+                    <div class="stat-row"><span class="label">Fallidas</span><span class="value">${stats.failed}</span></div>
+                    <div class="stat-row"><span class="label">Items extraidos</span><span class="value">${stats.extractedItems}</span></div>
+                    <div class="stat-row"><span class="label">Ultimo crawl</span><span class="value">${stats.lastCrawl ? new Date(stats.lastCrawl).toLocaleString() : '-'}</span></div>
+                    <div class="actions">
+                        <button onclick="launchCrawl(${site.id}, this)">Lanzar Crawl</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        async function loadItems() {
+            const siteId = document.getElementById('site-filter').value;
+            let url = '/api/stats/items?limit=50';
+            if (siteId) url += `&siteId=${siteId}`;
+
+            const res = await fetch(url);
+            const items = await res.json();
+
+            const tbody = document.getElementById('items-body');
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Sin items</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${esc(item.title)}</td>
+                    <td><a href="${esc(item.url)}" target="_blank" style="color:#2563eb;">${esc(truncate(item.url, 50))}</a></td>
+                    <td>${esc(item.siteName)}</td>
+                    <td>${new Date(item.extractedAt).toLocaleString()}</td>
+                    <td class="props-cell" title="${esc(item.properties || '')}">${esc(truncate(item.properties || '', 60))}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function launchCrawl(siteId, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Lanzando...';
+            try {
+                const res = await fetch(`/api/jobs/crawl/${siteId}`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`Crawl iniciado - Job #${data.jobExecutionId}`);
+                } else {
+                    showToast(`Error: ${data.error || 'desconocido'}`);
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`);
+            }
+            btn.disabled = false;
+            btn.textContent = 'Lanzar Crawl';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 4000);
+        }
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s || '';
+            return d.innerHTML;
+        }
+
+        function truncate(s, n) {
+            return s && s.length > n ? s.substring(0, n) + '...' : (s || '');
+        }
+
+        loadAll();
+    </script>
+</body>
+</html>
