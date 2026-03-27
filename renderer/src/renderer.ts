@@ -1,15 +1,27 @@
-import { chromium, Browser, Page } from 'playwright';
+import { Browser, Page } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-let browser: Browser | null = null;
+chromium.use(StealthPlugin());
 
-async function getBrowser(): Promise<Browser> {
-  if (!browser || !browser.isConnected()) {
-    browser = await chromium.launch({
+let headlessBrowser: Browser | null = null;
+
+async function getBrowser(headless: boolean): Promise<{ browser: Browser; owned: boolean }> {
+  if (!headless) {
+    const browser = await chromium.launch({
+      headless: false,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
+    });
+    return { browser, owned: true };
+  }
+
+  if (!headlessBrowser || !headlessBrowser.isConnected()) {
+    headlessBrowser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
     });
   }
-  return browser;
+  return { browser: headlessBrowser, owned: false };
 }
 
 export interface RenderOptions {
@@ -19,6 +31,7 @@ export interface RenderOptions {
   scrollToBottom: boolean;
   maxScrolls: number;
   timeout: number;
+  headless: boolean;
 }
 
 export interface InterceptedResponse {
@@ -33,10 +46,16 @@ export interface RenderResult {
 }
 
 export async function renderPage(options: RenderOptions): Promise<RenderResult> {
-  const browser = await getBrowser();
+  const { browser, owned } = await getBrowser(options.headless);
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport: { width: 1920, height: 1080 },
+    extraHTTPHeaders: {
+      'Accept-Language': 'es-PE,es;q=0.9,en;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    },
   });
+
   const page = await context.newPage();
 
   const interceptedResponses: InterceptedResponse[] = [];
@@ -81,6 +100,7 @@ export async function renderPage(options: RenderOptions): Promise<RenderResult> 
     return { html, interceptedResponses };
   } finally {
     await context.close();
+    if (owned) await browser.close();
   }
 }
 
@@ -113,11 +133,11 @@ async function autoScroll(page: Page, maxScrolls: number, timeout: number): Prom
 
 // Cleanup on process exit
 process.on('SIGINT', async () => {
-  if (browser) await browser.close();
+  if (headlessBrowser) await headlessBrowser.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  if (browser) await browser.close();
+  if (headlessBrowser) await headlessBrowser.close();
   process.exit(0);
 });

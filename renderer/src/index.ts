@@ -14,6 +14,7 @@ interface RenderRequest {
   scrollToBottom?: boolean;
   maxScrolls?: number;
   timeout?: number;
+  headless?: boolean;
 }
 
 app.post('/render', async (req, res) => {
@@ -32,6 +33,7 @@ app.post('/render', async (req, res) => {
       scrollToBottom: body.scrollToBottom || false,
       maxScrolls: body.maxScrolls || 20,
       timeout: body.timeout || DEFAULT_TIMEOUT,
+      headless: body.headless !== false,
     });
 
     res.json(result);
