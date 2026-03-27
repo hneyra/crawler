@@ -37,6 +37,13 @@ public class Category {
     @Column(name = "item_link_selector", nullable = false)
     private String itemLinkSelector;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "link_extraction_type", nullable = false)
+    private LinkExtractionType linkExtractionType = LinkExtractionType.HREF;
+
+    @Column(name = "link_attribute")
+    private String linkAttribute;
+
     @Column(name = "next_page_selector")
     private String nextPageSelector;
 
@@ -97,6 +104,22 @@ public class Category {
 
     public void setNextPageSelector(String nextPageSelector) {
         this.nextPageSelector = nextPageSelector;
+    }
+
+    public String getLinkAttribute() {
+        return linkAttribute;
+    }
+
+    public void setLinkAttribute(String linkAttribute) {
+        this.linkAttribute = linkAttribute;
+    }
+
+    public LinkExtractionType getLinkExtractionType() {
+        return linkExtractionType;
+    }
+
+    public void setLinkExtractionType(LinkExtractionType linkExtractionType) {
+        this.linkExtractionType = linkExtractionType;
     }
 
     public boolean isEnabled() {

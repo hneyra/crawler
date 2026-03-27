@@ -4,6 +4,7 @@ import crawler.config.CrawlerProperties;
 import crawler.model.Category;
 import crawler.model.DiscoveredUrl;
 import crawler.model.DiscoveredUrlRepository;
+import crawler.model.LinkExtractionType;
 import crawler.model.PaginationType;
 import crawler.model.UrlStatus;
 import java.net.URI;
@@ -11,7 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.HexFormat;
+import java.util.Map;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -29,6 +32,7 @@ public class ListDiscoveryService {
     private final DiscoveredUrlRepository discoveredUrlRepository;
     private final CrawlerProperties crawlerProperties;
     private final PlaywrightClient playwrightClient;
+    private final Map<LinkExtractionType, LinkExtractor> linkExtractors;
 
     public ListDiscoveryService(DiscoveredUrlRepository discoveredUrlRepository,
                                 CrawlerProperties crawlerProperties,
@@ -36,6 +40,10 @@ public class ListDiscoveryService {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.crawlerProperties = crawlerProperties;
         this.playwrightClient = playwrightClient;
+        this.linkExtractors = new EnumMap<>(LinkExtractionType.class);
+        this.linkExtractors.put(LinkExtractionType.HREF, new HrefLinkExtractor());
+        this.linkExtractors.put(LinkExtractionType.ONCLICK, new OnclickLinkExtractor());
+        this.linkExtractors.put(LinkExtractionType.DATA_ATTRIBUTE, new DataAttributeLinkExtractor());
     }
 
     public void discoverCategory(Category category) {
@@ -156,15 +164,18 @@ public class ListDiscoveryService {
         int newUrls = 0;
         int knownUrls = 0;
 
-        Elements links = doc.select(category.getItemLinkSelector());
+        LinkExtractor extractor = linkExtractors.get(category.getLinkExtractionType());
+        String baseUrl = doc.baseUri();
+        String linkAttribute = category.getLinkAttribute();
+        Elements elements = doc.select(category.getItemLinkSelector());
 
-        for (Element link : links) {
-            String href = link.absUrl("href");
-            if (href.isBlank()) {
+        for (Element element : elements) {
+            String url = extractor.extractUrl(element, baseUrl, linkAttribute);
+            if (url.isBlank()) {
                 continue;
             }
 
-            String normalized = normalizeUrl(href);
+            String normalized = normalizeUrl(url);
             if (normalized == null) {
                 continue;
             }

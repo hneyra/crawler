@@ -65,6 +65,8 @@ public class DataInitializer implements CommandLineRunner {
                 category.setPaginationType(catDef.getPaginationType());
                 category.setItemLinkSelector(catDef.getItemLinkSelector());
                 category.setNextPageSelector(catDef.getNextPageSelector());
+                category.setLinkExtractionType(catDef.getLinkExtractionType());
+                category.setLinkAttribute(catDef.getLinkAttribute());
                 category.setEnabled(catDef.isEnabled());
                 categoryRepository.save(category);
                 log.info("  Created category '{}'", category.getName());

@@ -1,5 +1,6 @@
 package crawler.config;
 
+import crawler.model.LinkExtractionType;
 import crawler.model.PaginationType;
 
 public class CategoryDefinition {
@@ -9,6 +10,8 @@ public class CategoryDefinition {
     private PaginationType paginationType = PaginationType.PAGE_PARAM;
     private String itemLinkSelector;
     private String nextPageSelector;
+    private LinkExtractionType linkExtractionType;
+    private String linkAttribute;
     private boolean enabled = true;
 
     public String getName() {
@@ -59,4 +62,19 @@ public class CategoryDefinition {
         this.enabled = enabled;
     }
 
+    public LinkExtractionType getLinkExtractionType() {
+        return linkExtractionType;
+    }
+
+    public void setLinkExtractionType(LinkExtractionType linkExtractionType) {
+        this.linkExtractionType = linkExtractionType;
+    }
+
+    public String getLinkAttribute() {
+        return linkAttribute;
+    }
+
+    public void setLinkAttribute(String linkAttribute) {
+        this.linkAttribute = linkAttribute;
+    }
 }
