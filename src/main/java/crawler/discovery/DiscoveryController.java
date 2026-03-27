@@ -35,7 +35,7 @@ public class DiscoveryController {
 
     @PostMapping("/category/{id}")
     public ResponseEntity<String> discoverCategory(@PathVariable Long id) {
-        Category category = categoryRepository.findById(id).orElse(null);
+        Category category = categoryRepository.findByIdWithSite(id).orElse(null);
         if (category == null) {
             return ResponseEntity.notFound().build();
         }
@@ -52,7 +52,7 @@ public class DiscoveryController {
             return ResponseEntity.notFound().build();
         }
 
-        List<Category> categories = categoryRepository.findBySiteIdAndEnabledTrue(id);
+        List<Category> categories = categoryRepository.findBySiteIdAndEnabledTrueWithSite(id);
         if (categories.isEmpty()) {
             return ResponseEntity.ok("No enabled categories found for site: " + site.getName());
         }

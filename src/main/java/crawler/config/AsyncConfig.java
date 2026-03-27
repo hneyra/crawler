@@ -1,10 +1,11 @@
 package crawler.config;
 
-import java.util.concurrent.Executor;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
-import org.springframework.batch.core.repository.JobRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.concurrent.Executor;
+import org.springframework.batch.core.configuration.JobRegistry;
+import org.springframework.batch.core.launch.JobOperator;
+import org.springframework.batch.core.launch.support.TaskExecutorJobOperator;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -40,12 +41,13 @@ public class AsyncConfig {
     }
 
     @Bean
-    public JobLauncher jobLauncher(JobRepository jobRepository) throws Exception {
-        TaskExecutorJobLauncher launcher = new TaskExecutorJobLauncher();
-        launcher.setJobRepository(jobRepository);
-        launcher.setTaskExecutor(new SimpleAsyncTaskExecutor("crawl-job-"));
-        launcher.afterPropertiesSet();
-        return launcher;
+    public JobOperator jobOperator(JobRepository jobRepository, JobRegistry jobRegistry) throws Exception {
+        TaskExecutorJobOperator operator = new TaskExecutorJobOperator();
+        operator.setJobRepository(jobRepository);
+        operator.setJobRegistry(jobRegistry);
+        operator.setTaskExecutor(new SimpleAsyncTaskExecutor("crawl-job-"));
+        operator.afterPropertiesSet();
+        return operator;
     }
 
 }

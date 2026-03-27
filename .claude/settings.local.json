@@ -15,7 +15,9 @@
       "Bash(netstat -ano)",
       "Bash(findstr \":8080\")",
       "Bash(taskkill:*)",
-      "Bash(cmd //c \"taskkill /PID 32040 /F\")"
+      "Bash(cmd //c \"taskkill /PID 32040 /F\")",
+      "Bash(cd /tmp)",
+      "Bash(jar xf:*)"
     ]
   }
 }

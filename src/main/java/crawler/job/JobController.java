@@ -6,7 +6,7 @@ import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.repository.explore.JobExplorer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,12 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/jobs")
 public class JobController {
 
-    private final JobLauncher jobLauncher;
+    private final JobOperator jobOperator;
     private final Job crawlJob;
     private final JobExplorer jobExplorer;
 
-    public JobController(JobLauncher jobLauncher, Job crawlJob, JobExplorer jobExplorer) {
-        this.jobLauncher = jobLauncher;
+    public JobController(JobOperator jobOperator, Job crawlJob, JobExplorer jobExplorer) {
+        this.jobOperator = jobOperator;
         this.crawlJob = crawlJob;
         this.jobExplorer = jobExplorer;
     }
@@ -38,7 +38,7 @@ public class JobController {
                     .addLong("run.id", System.currentTimeMillis())
                     .toJobParameters();
 
-            JobExecution execution = jobLauncher.run(crawlJob, params);
+            JobExecution execution = jobOperator.run(crawlJob, params);
 
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("jobExecutionId", execution.getId());
