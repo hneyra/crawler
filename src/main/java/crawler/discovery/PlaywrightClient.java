@@ -35,29 +35,28 @@ public class PlaywrightClient {
             List<String> interceptPatterns,
             boolean scrollToBottom,
             int maxScrolls,
-            int timeout,
-            boolean headless
+            int timeout
     ) {
         public static RenderRequest scrolling(String url, int maxScrolls, int timeout) {
-            return new RenderRequest(url, null, List.of(), true, maxScrolls, timeout, true);
+            return new RenderRequest(url, null, List.of(), true, maxScrolls, timeout);
         }
 
         public static RenderRequest withIntercept(String url, List<String> interceptPatterns,
                                                    String waitForSelector, int timeout) {
-            return new RenderRequest(url, waitForSelector, interceptPatterns, false, 0, timeout, true);
+            return new RenderRequest(url, waitForSelector, interceptPatterns, false, 0, timeout);
         }
 
         public static RenderRequest scrollingWithIntercept(String url, List<String> interceptPatterns,
                                                             int maxScrolls, int timeout) {
-            return new RenderRequest(url, null, interceptPatterns, true, maxScrolls, timeout, true);
+            return new RenderRequest(url, null, interceptPatterns, true, maxScrolls, timeout);
         }
 
         public static RenderRequest simple(String url, int timeout) {
-            return new RenderRequest(url, null, List.of(), false, 0, timeout, true);
+            return new RenderRequest(url, null, List.of(), false, 0, timeout);
         }
 
         public static RenderRequest simple(String url, String waitForSelector, int timeout) {
-            return new RenderRequest(url, waitForSelector, List.of(), false, 0, timeout, false);
+            return new RenderRequest(url, waitForSelector, List.of(), false, 0, timeout);
         }
     }
 

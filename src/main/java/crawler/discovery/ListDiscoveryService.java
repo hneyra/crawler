@@ -131,6 +131,7 @@ public class ListDiscoveryService {
     }
 
     private Document fetchDocument(String url, String itemLinkSelector) throws Exception {
+        // Step 1: Jsoup
         Document doc;
         try {
             doc = Jsoup.connect(url)
@@ -139,22 +140,21 @@ public class ListDiscoveryService {
                     .get();
         } catch (org.jsoup.HttpStatusException e) {
             if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
-                log.warn("Cloudflare block detected (HTTP {}), retrying with Playwright: {}",
-                        e.getStatusCode(), url);
-                return renderDocumentWithPlaywright(url, itemLinkSelector);
+                log.warn("Cloudflare block (HTTP {}), falling back to Playwright: {}", e.getStatusCode(), url);
+                return renderDocument(url, itemLinkSelector);
             }
             throw e;
         }
 
         if (CloudflareDetector.isCloudflareBlock(doc)) {
-            log.warn("Cloudflare challenge page detected, retrying with Playwright: {}", url);
-            return renderDocumentWithPlaywright(url, itemLinkSelector);
+            log.warn("Cloudflare challenge detected, falling back to Playwright: {}", url);
+            return renderDocument(url, itemLinkSelector);
         }
 
         return doc;
     }
 
-    private Document renderDocumentWithPlaywright(String url, String waitForSelector) throws Exception {
+    private Document renderDocument(String url, String waitForSelector) throws Exception {
         PlaywrightClient.RenderRequest request = PlaywrightClient.RenderRequest.simple(url, waitForSelector, 30_000);
         PlaywrightClient.RenderResponse response = playwrightClient.render(request);
         return Jsoup.parse(response.html(), url);

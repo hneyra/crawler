@@ -128,30 +128,9 @@ public class DetailExtractionService {
         }
     }
 
-    private void processUrlWithJsoup(DiscoveredUrl discovered, Site site,
-                                      ExtractionConfig config) throws Exception {
-        Document doc;
-        try {
-            doc = Jsoup.connect(discovered.getUrl())
-                    .userAgent("CrawlerBot/1.0")
-                    .timeout(15_000)
-                    .get();
-        } catch (org.jsoup.HttpStatusException e) {
-            if (crawler.discovery.CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
-                log.warn("Cloudflare block detected (HTTP {}), retrying with Playwright: {}",
-                        e.getStatusCode(), discovered.getUrl());
-                processUrlWithPlaywrightSimple(discovered, site, config);
-                return;
-            }
-            throw e;
-        }
-
-        if (crawler.discovery.CloudflareDetector.isCloudflareBlock(doc)) {
-            log.warn("Cloudflare challenge page detected, retrying with Playwright: {}",
-                    discovered.getUrl());
-            processUrlWithPlaywrightSimple(discovered, site, config);
-            return;
-        }
+    private void processUrl(DiscoveredUrl discovered, Site site,
+                            ExtractionConfig config) throws Exception {
+        Document doc = fetchDocument(discovered.getUrl());
 
         String html = doc.outerHtml();
         String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
@@ -173,6 +152,36 @@ public class DetailExtractionService {
         }
 
         saveExtractedItem(discovered, site, doc, properties, snapshotPath);
+    }
+
+    private Document fetchDocument(String url) throws Exception {
+        // Step 1: Jsoup
+        Document doc;
+        try {
+            doc = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .timeout(15_000)
+                    .get();
+        } catch (org.jsoup.HttpStatusException e) {
+            if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
+                log.warn("Cloudflare block (HTTP {}), falling back to Playwright: {}", e.getStatusCode(), url);
+                return renderDocument(url);
+            }
+            throw e;
+        }
+
+        if (CloudflareDetector.isCloudflareBlock(doc)) {
+            log.warn("Cloudflare challenge detected, falling back to Playwright: {}", url);
+            return renderDocument(url);
+        }
+
+        return doc;
+    }
+
+    private Document renderDocument(String url) throws Exception {
+        RenderRequest request = RenderRequest.simple(url, 30_000);
+        RenderResponse response = playwrightClient.render(request);
+        return Jsoup.parse(response.html(), url);
     }
 
     private void processUrlWithPlaywright(DiscoveredUrl discovered, Site site,
@@ -218,31 +227,6 @@ public class DetailExtractionService {
         }
 
         extractJsonLd(doc, config, properties);
-
-        saveExtractedItem(discovered, site, doc, properties, snapshotPath);
-    }
-
-    private void processUrlWithPlaywrightSimple(DiscoveredUrl discovered, Site site,
-                                                 ExtractionConfig config) throws Exception {
-        RenderRequest request = RenderRequest.simple(discovered.getUrl(), 30_000);
-        RenderResponse response = playwrightClient.render(request);
-
-        String html = response.html();
-        String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
-        Document doc = Jsoup.parse(html, discovered.getUrl());
-
-        Map<String, Object> properties = new LinkedHashMap<>();
-
-        if (config != null) {
-            DetailStrategy strategy = config.getDetailStrategy();
-            if (strategy == DetailStrategy.HTML || strategy == null) {
-                extractFromHtml(doc, config.getFieldSelectors(), properties);
-            }
-            if (strategy == DetailStrategy.SCRIPT_JSON || strategy == null) {
-                extractFromScripts(doc, config, properties);
-            }
-            extractJsonLd(doc, config, properties);
-        }
 
         saveExtractedItem(discovered, site, doc, properties, snapshotPath);
     }

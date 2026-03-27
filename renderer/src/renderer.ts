@@ -5,6 +5,7 @@ import fs from 'fs';
 
 const PROFILES_DIR = process.env.PROFILES_DIR || path.join(process.cwd(), 'browser-profiles');
 const CDP_PORT = parseInt(process.env.CDP_PORT || '9222', 10);
+const HEADLESS = process.env.HEADLESS !== 'false';
 
 let connectedBrowser: Browser | null = null;
 let chromeProcess: ChildProcess | null = null;
@@ -24,9 +25,9 @@ function findChrome(): string {
   throw new Error('No Chrome/Chromium found. Install with: sudo apt install google-chrome-stable');
 }
 
-function launchChromeProcess(headless: boolean): void {
+function launchChromeProcess(): void {
   const chromePath = findChrome();
-  const profileDir = path.join(PROFILES_DIR, headless ? 'headless' : 'headed');
+  const profileDir = path.join(PROFILES_DIR, HEADLESS ? 'headless' : 'headed');
   fs.mkdirSync(profileDir, { recursive: true });
 
   const args = [
@@ -39,7 +40,7 @@ function launchChromeProcess(headless: boolean): void {
     '--lang=es-PE',
   ];
 
-  if (headless) {
+  if (HEADLESS) {
     args.push('--headless=new');
   }
 
@@ -68,7 +69,7 @@ async function waitForCDP(timeoutMs: number = 10000): Promise<void> {
   throw new Error(`Chrome CDP not available on port ${CDP_PORT} after ${timeoutMs}ms`);
 }
 
-async function getBrowser(headless: boolean): Promise<Browser> {
+async function getBrowser(): Promise<Browser> {
   if (connectedBrowser?.isConnected()) {
     return connectedBrowser;
   }
@@ -81,7 +82,7 @@ async function getBrowser(headless: boolean): Promise<Browser> {
   } catch { /* not running */ }
 
   if (!cdpReady) {
-    launchChromeProcess(headless);
+    launchChromeProcess();
     await waitForCDP();
   }
 
@@ -97,7 +98,6 @@ export interface RenderOptions {
   scrollToBottom: boolean;
   maxScrolls: number;
   timeout: number;
-  headless: boolean;
 }
 
 export interface InterceptedResponse {
@@ -132,7 +132,7 @@ async function waitForCloudflare(page: Page, timeout: number): Promise<void> {
 }
 
 export async function renderPage(options: RenderOptions): Promise<RenderResult> {
-  const browser = await getBrowser(options.headless);
+  const browser = await getBrowser();
 
   // Reuse the browser's default context (which has Cloudflare cookies)
   // instead of creating a new isolated context
