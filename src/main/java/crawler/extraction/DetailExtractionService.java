@@ -129,10 +129,28 @@ public class DetailExtractionService {
 
     private void processUrlWithJsoup(DiscoveredUrl discovered, Site site,
                                       ExtractionConfig config) throws Exception {
-        Document doc = Jsoup.connect(discovered.getUrl())
-                .userAgent("CrawlerBot/1.0")
-                .timeout(15_000)
-                .get();
+        Document doc;
+        try {
+            doc = Jsoup.connect(discovered.getUrl())
+                    .userAgent("CrawlerBot/1.0")
+                    .timeout(15_000)
+                    .get();
+        } catch (org.jsoup.HttpStatusException e) {
+            if (crawler.discovery.CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
+                log.warn("Cloudflare block detected (HTTP {}), retrying with Playwright: {}",
+                        e.getStatusCode(), discovered.getUrl());
+                processUrlWithPlaywrightSimple(discovered, site, config);
+                return;
+            }
+            throw e;
+        }
+
+        if (crawler.discovery.CloudflareDetector.isCloudflareBlock(doc)) {
+            log.warn("Cloudflare challenge page detected, retrying with Playwright: {}",
+                    discovered.getUrl());
+            processUrlWithPlaywrightSimple(discovered, site, config);
+            return;
+        }
 
         String html = doc.outerHtml();
         String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
@@ -199,6 +217,31 @@ public class DetailExtractionService {
         }
 
         extractJsonLd(doc, config, properties);
+
+        saveExtractedItem(discovered, site, doc, properties, snapshotPath);
+    }
+
+    private void processUrlWithPlaywrightSimple(DiscoveredUrl discovered, Site site,
+                                                 ExtractionConfig config) throws Exception {
+        RenderRequest request = RenderRequest.simple(discovered.getUrl(), 30_000);
+        RenderResponse response = playwrightClient.render(request);
+
+        String html = response.html();
+        String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
+        Document doc = Jsoup.parse(html, discovered.getUrl());
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+
+        if (config != null) {
+            DetailStrategy strategy = config.getDetailStrategy();
+            if (strategy == DetailStrategy.HTML || strategy == null) {
+                extractFromHtml(doc, config.getFieldSelectors(), properties);
+            }
+            if (strategy == DetailStrategy.SCRIPT_JSON || strategy == null) {
+                extractFromScripts(doc, config, properties);
+            }
+            extractJsonLd(doc, config, properties);
+        }
 
         saveExtractedItem(discovered, site, doc, properties, snapshotPath);
     }

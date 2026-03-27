@@ -276,7 +276,7 @@ class DetailExtractionServiceUnitTest {
         category.setSite(site);
         category.setName("Test Cat");
         category.setUrl("https://example.com/cat");
-        category.setPaginationType(PaginationType.STATIC);
+        category.setPaginationType(PaginationType.PAGE_PARAM);
         category.setItemLinkSelector("a");
         category.setEnabled(true);
 

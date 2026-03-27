@@ -26,7 +26,7 @@ Discovers product/item URLs from category listing pages. Two strategies based on
 
 ## Important Details
 
-- `normalizeUrl(String)` and `sha256(String)` are **package-private static** methods — directly testable from same package
+- `normalizeUrl(String)` is **package-private static** and `sha256(String)` is **public static** — both directly testable
 - `findNextPageUrl` checks in order: custom `nextPageSelector`, `a[rel=next]`, heuristic text matching ("Next", "Siguiente", "›", "»")
 - `PlaywrightClient` uses records: `RenderRequest`, `RenderResponse`, `InterceptedResponse`
 - `PlaywrightClient.RenderRequest` has factory methods: `scrolling()`, `withIntercept()`, `scrollingWithIntercept()`
