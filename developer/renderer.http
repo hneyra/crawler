@@ -2,8 +2,8 @@ POST http://localhost:3000/render
 Content-Type: application/json
 
 {
-  "url": "https://google.com/category/products",
-  "waitForSelector": ".product-list",
+  "url": "https://www.falabella.com.pe/falabella-pe/category/cat760706/Celulares-y-Telefonos",
+  "waitForSelector": ".search-results--products",
   "interceptPatterns": ["\\*.png", "\\*.jpg", "\\*.gif", "\\*.woff2"],
   "scrollToBottom": true,
   "maxScrolls": 10,

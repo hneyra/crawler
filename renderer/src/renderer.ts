@@ -1,4 +1,4 @@
-import { chromium, Browser, Page, Response } from 'playwright';
+import { chromium, Browser, Page } from 'playwright';
 
 let browser: Browser | null = null;
 
@@ -35,50 +35,40 @@ export interface RenderResult {
 export async function renderPage(options: RenderOptions): Promise<RenderResult> {
   const browser = await getBrowser();
   const context = await browser.newContext({
-    userAgent: 'CrawlerBot/1.0',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   });
   const page = await context.newPage();
 
   const interceptedResponses: InterceptedResponse[] = [];
-  const patterns = options.interceptPatterns.map((p) => new RegExp(p));
 
-  // Intercept fetch/XHR responses
-  if (patterns.length > 0) {
-    page.on('response', async (response: Response) => {
-      const url = response.url();
-      const resourceType = response.request().resourceType();
-
-      if (resourceType !== 'fetch' && resourceType !== 'xhr') {
-        return;
-      }
-
-      const matches = patterns.some((re) => re.test(url));
-      if (!matches) {
-        return;
-      }
-
-      try {
-        const body = await response.text();
-        interceptedResponses.push({
-          url,
-          status: response.status(),
-          body,
-        });
-      } catch {
-        // response body may not be available
+  // Block static resources to speed up loading
+  if (options.interceptPatterns.length > 0) {
+    const blockPatterns = options.interceptPatterns.map((p) =>
+      new RegExp(p.replace(/\\\*/g, '.*'))
+    );
+    await context.route('**/*', (route) => {
+      const url = route.request().url();
+      if (blockPatterns.some((re) => re.test(url))) {
+        route.abort();
+      } else {
+        route.continue();
       }
     });
   }
 
+  const startTime = Date.now();
+
   try {
     await page.goto(options.url, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: options.timeout,
     });
 
     if (options.waitForSelector) {
+      const elapsed = Date.now() - startTime;
+      const remaining = options.timeout - elapsed;
       await page.waitForSelector(options.waitForSelector, {
-        timeout: options.timeout,
+        timeout: Math.max(remaining, 5000),
       });
     }
 
