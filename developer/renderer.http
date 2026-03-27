@@ -1,0 +1,15 @@
+POST http://localhost:3000/render
+Content-Type: application/json
+
+{
+  "url": "https://google.com/category/products",
+  "waitForSelector": ".product-list",
+  "interceptPatterns": ["\\*.png", "\\*.jpg", "\\*.gif", "\\*.woff2"],
+  "scrollToBottom": true,
+  "maxScrolls": 10,
+  "timeout": 30000
+}
+
+###
+
+GET http://localhost:3000/health
