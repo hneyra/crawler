@@ -49,6 +49,10 @@ public class PlaywrightClient {
                                                             int maxScrolls, int timeout) {
             return new RenderRequest(url, null, interceptPatterns, true, maxScrolls, timeout);
         }
+
+        public static RenderRequest simple(String url, int timeout) {
+            return new RenderRequest(url, null, List.of(), false, 0, timeout);
+        }
     }
 
     public record InterceptedResponse(String url, int status, String body) {}

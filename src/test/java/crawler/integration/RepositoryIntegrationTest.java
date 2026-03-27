@@ -2,6 +2,7 @@ package crawler.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import crawler.config.DataInitializer;
 import crawler.model.Category;
 import crawler.model.CategoryRepository;
 import crawler.model.DiscoveredUrl;
@@ -18,17 +19,16 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@SpringBootTest
 @Testcontainers
 @ActiveProfiles("test")
 class RepositoryIntegrationTest {
@@ -36,6 +36,10 @@ class RepositoryIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @MockitoBean
+    @SuppressWarnings("unused")
+    private DataInitializer dataInitializer;
 
     @Autowired
     private SiteRepository siteRepository;
@@ -71,7 +75,7 @@ class RepositoryIntegrationTest {
         category.setSite(site);
         category.setName("Electronics");
         category.setUrl("https://example.com/electronics");
-        category.setPaginationType(PaginationType.STATIC);
+        category.setPaginationType(PaginationType.PAGE_PARAM);
         category.setItemLinkSelector("a.product-link");
         category.setEnabled(true);
         category = categoryRepository.save(category);
@@ -104,7 +108,7 @@ class RepositoryIntegrationTest {
         disabled.setSite(site);
         disabled.setName("Disabled Cat");
         disabled.setUrl("https://example.com/disabled");
-        disabled.setPaginationType(PaginationType.STATIC);
+        disabled.setPaginationType(PaginationType.PAGE_PARAM);
         disabled.setItemLinkSelector("a");
         disabled.setEnabled(false);
         categoryRepository.save(disabled);

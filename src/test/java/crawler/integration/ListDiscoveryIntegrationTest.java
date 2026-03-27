@@ -5,10 +5,14 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import crawler.config.DataInitializer;
 import crawler.discovery.ListDiscoveryService;
+import crawler.discovery.PlaywrightClient;
 import crawler.model.Category;
 import crawler.model.CategoryRepository;
 import crawler.model.DiscoveredUrlRepository;
@@ -23,8 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -46,9 +50,12 @@ class ListDiscoveryIntegrationTest {
                     .dynamicPort())
             .build();
 
-    @MockBean
+    @MockitoBean
     @SuppressWarnings("unused")
     private DataInitializer dataInitializer;
+
+    @MockitoBean
+    private PlaywrightClient playwrightClient;
 
     @Autowired
     private ListDiscoveryService listDiscoveryService;
@@ -95,7 +102,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/category/phones",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
 
         listDiscoveryService.discoverCategory(category);
@@ -131,7 +138,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/category/phones",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
 
         listDiscoveryService.discoverCategory(category);
@@ -160,7 +167,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/category/phones",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
 
         listDiscoveryService.discoverCategory(category);
@@ -175,7 +182,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/category/errors",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
 
         // Should not throw
@@ -195,7 +202,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/category/test",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
 
         listDiscoveryService.discoverCategory(category);
@@ -227,7 +234,7 @@ class ListDiscoveryIntegrationTest {
 
         Category category = saveCategory(
                 wireMock.baseUrl() + "/shop",
-                PaginationType.STATIC,
+                PaginationType.PAGE_PARAM,
                 "a.item");
         category.setNextPageSelector("a.custom-next");
         categoryRepository.save(category);
@@ -235,6 +242,62 @@ class ListDiscoveryIntegrationTest {
         listDiscoveryService.discoverCategory(category);
 
         assertThat(discoveredUrlRepository.findAll()).hasSize(2);
+    }
+
+    // -------------------------------------------------------------------------
+    // Cloudflare fallback (Jsoup → Playwright)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void discoverCategory_fallsBackToPlaywrightOnCloudflare403() {
+        stubFor(get(urlEqualTo("/category/blocked"))
+                .willReturn(aResponse().withStatus(403)));
+
+        String playwrightHtml = buildHtmlPage(List.of("/product/cf1", "/product/cf2"), null);
+        when(playwrightClient.render(any()))
+                .thenReturn(new PlaywrightClient.RenderResponse(playwrightHtml, List.of()));
+
+        Category category = saveCategory(
+                wireMock.baseUrl() + "/category/blocked",
+                PaginationType.PAGE_PARAM,
+                "a.item");
+
+        listDiscoveryService.discoverCategory(category);
+
+        verify(playwrightClient).render(any());
+        List<crawler.model.DiscoveredUrl> saved = discoveredUrlRepository.findAll();
+        assertThat(saved).hasSize(2);
+        assertThat(saved).extracting(crawler.model.DiscoveredUrl::getUrl)
+                .containsExactlyInAnyOrder(
+                        wireMock.baseUrl() + "/product/cf1",
+                        wireMock.baseUrl() + "/product/cf2");
+    }
+
+    @Test
+    void discoverCategory_fallsBackToPlaywrightOnCloudflareChallengePage() {
+        String cfChallengePage = "<html><head><title>Just a moment...</title></head>"
+                + "<body><div id='cf-browser-verification'></div></body></html>";
+        stubFor(get(urlEqualTo("/category/challenge"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", MediaType.TEXT_HTML_VALUE)
+                        .withBody(cfChallengePage)));
+
+        String playwrightHtml = buildHtmlPage(List.of("/product/real1"), null);
+        when(playwrightClient.render(any()))
+                .thenReturn(new PlaywrightClient.RenderResponse(playwrightHtml, List.of()));
+
+        Category category = saveCategory(
+                wireMock.baseUrl() + "/category/challenge",
+                PaginationType.PAGE_PARAM,
+                "a.item");
+
+        listDiscoveryService.discoverCategory(category);
+
+        verify(playwrightClient).render(any());
+        assertThat(discoveredUrlRepository.findAll()).hasSize(1);
+        assertThat(discoveredUrlRepository.findAll().get(0).getUrl())
+                .isEqualTo(wireMock.baseUrl() + "/product/real1");
     }
 
     // -------------------------------------------------------------------------

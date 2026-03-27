@@ -71,10 +71,7 @@ public class ListDiscoveryService {
 
             Document doc;
             try {
-                doc = Jsoup.connect(currentUrl)
-                        .userAgent("CrawlerBot/1.0")
-                        .timeout(15_000)
-                        .get();
+                doc = fetchDocument(currentUrl);
             } catch (Exception e) {
                 log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage());
                 break;
@@ -123,6 +120,36 @@ public class ListDiscoveryService {
 
         log.info("Playwright discovery complete for category '{}': newUrls={}, knownUrls={}",
                 categoryName, counts[0], counts[1]);
+    }
+
+    private Document fetchDocument(String url) throws Exception {
+        Document doc;
+        try {
+            doc = Jsoup.connect(url)
+                    .userAgent("CrawlerBot/1.0")
+                    .timeout(15_000)
+                    .get();
+        } catch (org.jsoup.HttpStatusException e) {
+            if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
+                log.warn("Cloudflare block detected (HTTP {}), retrying with Playwright: {}",
+                        e.getStatusCode(), url);
+                return renderDocumentWithPlaywright(url);
+            }
+            throw e;
+        }
+
+        if (CloudflareDetector.isCloudflareBlock(doc)) {
+            log.warn("Cloudflare challenge page detected, retrying with Playwright: {}", url);
+            return renderDocumentWithPlaywright(url);
+        }
+
+        return doc;
+    }
+
+    private Document renderDocumentWithPlaywright(String url) throws Exception {
+        PlaywrightClient.RenderRequest request = PlaywrightClient.RenderRequest.simple(url, 30_000);
+        PlaywrightClient.RenderResponse response = playwrightClient.render(request);
+        return Jsoup.parse(response.html(), url);
     }
 
     private int[] extractLinks(Document doc, Category category) {
@@ -213,7 +240,7 @@ public class ListDiscoveryService {
         }
     }
 
-    static String sha256(String input) {
+    public static String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
