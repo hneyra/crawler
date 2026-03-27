@@ -71,7 +71,7 @@ public class ListDiscoveryService {
 
             Document doc;
             try {
-                doc = fetchDocument(currentUrl);
+                doc = fetchDocument(currentUrl, category.getItemLinkSelector());
             } catch (Exception e) {
                 log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage());
                 break;
@@ -122,32 +122,32 @@ public class ListDiscoveryService {
                 categoryName, counts[0], counts[1]);
     }
 
-    private Document fetchDocument(String url) throws Exception {
+    private Document fetchDocument(String url, String itemLinkSelector) throws Exception {
         Document doc;
         try {
             doc = Jsoup.connect(url)
-                    .userAgent("CrawlerBot/1.0")
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     .timeout(15_000)
                     .get();
         } catch (org.jsoup.HttpStatusException e) {
             if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
                 log.warn("Cloudflare block detected (HTTP {}), retrying with Playwright: {}",
                         e.getStatusCode(), url);
-                return renderDocumentWithPlaywright(url);
+                return renderDocumentWithPlaywright(url, itemLinkSelector);
             }
             throw e;
         }
 
         if (CloudflareDetector.isCloudflareBlock(doc)) {
             log.warn("Cloudflare challenge page detected, retrying with Playwright: {}", url);
-            return renderDocumentWithPlaywright(url);
+            return renderDocumentWithPlaywright(url, itemLinkSelector);
         }
 
         return doc;
     }
 
-    private Document renderDocumentWithPlaywright(String url) throws Exception {
-        PlaywrightClient.RenderRequest request = PlaywrightClient.RenderRequest.simple(url, 30_000);
+    private Document renderDocumentWithPlaywright(String url, String waitForSelector) throws Exception {
+        PlaywrightClient.RenderRequest request = PlaywrightClient.RenderRequest.simple(url, waitForSelector, 30_000);
         PlaywrightClient.RenderResponse response = playwrightClient.render(request);
         return Jsoup.parse(response.html(), url);
     }

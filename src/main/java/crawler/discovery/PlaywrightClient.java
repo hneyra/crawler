@@ -53,6 +53,10 @@ public class PlaywrightClient {
         public static RenderRequest simple(String url, int timeout) {
             return new RenderRequest(url, null, List.of(), false, 0, timeout);
         }
+
+        public static RenderRequest simple(String url, String waitForSelector, int timeout) {
+            return new RenderRequest(url, waitForSelector, List.of(), false, 0, timeout);
+        }
     }
 
     public record InterceptedResponse(String url, int status, String body) {}
