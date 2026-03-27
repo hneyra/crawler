@@ -133,9 +133,14 @@ async function waitForCloudflare(page: Page, timeout: number): Promise<void> {
 
 export async function renderPage(options: RenderOptions): Promise<RenderResult> {
   const browser = await getBrowser(options.headless);
-  const context = await browser.newContext({
+
+  // Reuse the browser's default context (which has Cloudflare cookies)
+  // instead of creating a new isolated context
+  const existingContexts = browser.contexts();
+  const context = existingContexts.length > 0 ? existingContexts[0] : await browser.newContext({
     viewport: { width: 1920, height: 1080 },
   });
+  const isDefaultContext = existingContexts.length > 0;
   const page = await context.newPage();
 
   const interceptedResponses: InterceptedResponse[] = [];
@@ -181,7 +186,10 @@ export async function renderPage(options: RenderOptions): Promise<RenderResult> 
     return { html, interceptedResponses };
   } finally {
     await page.close();
-    await context.close();
+    // Only close the context if we created it (not the default/shared one)
+    if (!isDefaultContext) {
+      await context.close();
+    }
   }
 }
 

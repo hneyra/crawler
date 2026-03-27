@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import crawler.config.CrawlerProperties;
+import crawler.discovery.CloudflareDetector;
 import crawler.discovery.PlaywrightClient;
 import crawler.discovery.PlaywrightClient.InterceptedResponse;
 import crawler.discovery.PlaywrightClient.RenderRequest;
@@ -94,17 +95,17 @@ public class DetailExtractionService {
 
             ExtractionConfig config = site.getExtractionConfig();
             int politenessDelayMs = site.getPolitenessDelayMs();
-            boolean useAjax = config != null && config.getDetailStrategy() == DetailStrategy.AJAX;
+            DetailStrategy strategy = config != null ? config.getDetailStrategy() : null;
 
             for (int i = 0; i < batch.size(); i++) {
                 DiscoveredUrl discovered = batch.get(i);
                 MDC.put("categoryId", String.valueOf(discovered.getCategory().getId()));
                 MDC.put("url", discovered.getUrl());
                 try {
-                    if (useAjax) {
+                    if (strategy == DetailStrategy.AJAX) {
                         processUrlWithPlaywright(discovered, site, config);
                     } else {
-                        processUrlWithJsoup(discovered, site, config);
+                        processUrl(discovered, site, config);
                     }
                     discovered.setStatus(UrlStatus.COMPLETED);
                     log.info("Extracted successfully");

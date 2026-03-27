@@ -22,7 +22,8 @@
       "Bash(npm install:*)",
       "Bash(sudo apt-get:*)",
       "Bash(npx patchright:*)",
-      "Bash(echo \"DISPLAY=$DISPLAY\")"
+      "Bash(echo \"DISPLAY=$DISPLAY\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }
