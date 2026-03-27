@@ -73,7 +73,7 @@ public class ListDiscoveryService {
             try {
                 doc = fetchDocument(currentUrl, category.getItemLinkSelector());
             } catch (Exception e) {
-                log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage());
+                log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage(), e);
                 break;
             }
 

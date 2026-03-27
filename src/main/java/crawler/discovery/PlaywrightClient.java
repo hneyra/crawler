@@ -16,6 +16,7 @@ public class PlaywrightClient {
     public PlaywrightClient(CrawlerProperties properties, WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .baseUrl(properties.getRendererBaseUrl())
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
                 .build();
     }
 
@@ -34,28 +35,29 @@ public class PlaywrightClient {
             List<String> interceptPatterns,
             boolean scrollToBottom,
             int maxScrolls,
-            int timeout
+            int timeout,
+            boolean headless
     ) {
         public static RenderRequest scrolling(String url, int maxScrolls, int timeout) {
-            return new RenderRequest(url, null, List.of(), true, maxScrolls, timeout);
+            return new RenderRequest(url, null, List.of(), true, maxScrolls, timeout, true);
         }
 
         public static RenderRequest withIntercept(String url, List<String> interceptPatterns,
                                                    String waitForSelector, int timeout) {
-            return new RenderRequest(url, waitForSelector, interceptPatterns, false, 0, timeout);
+            return new RenderRequest(url, waitForSelector, interceptPatterns, false, 0, timeout, true);
         }
 
         public static RenderRequest scrollingWithIntercept(String url, List<String> interceptPatterns,
                                                             int maxScrolls, int timeout) {
-            return new RenderRequest(url, null, interceptPatterns, true, maxScrolls, timeout);
+            return new RenderRequest(url, null, interceptPatterns, true, maxScrolls, timeout, true);
         }
 
         public static RenderRequest simple(String url, int timeout) {
-            return new RenderRequest(url, null, List.of(), false, 0, timeout);
+            return new RenderRequest(url, null, List.of(), false, 0, timeout, true);
         }
 
         public static RenderRequest simple(String url, String waitForSelector, int timeout) {
-            return new RenderRequest(url, waitForSelector, List.of(), false, 0, timeout);
+            return new RenderRequest(url, waitForSelector, List.of(), false, 0, timeout, false);
         }
     }
 
