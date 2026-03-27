@@ -19,7 +19,10 @@
       "Bash(cd /tmp)",
       "Bash(jar xf:*)",
       "Read(//mnt/c/Users/Jorge/IdeaProjects/crawler/**)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(sudo apt-get:*)",
+      "Bash(npx patchright:*)",
+      "Bash(echo \"DISPLAY=$DISPLAY\")"
     ]
   }
 }
