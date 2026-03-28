@@ -31,5 +31,14 @@ Content-Type: application/json
   "headless": false
 }
 
+### Navigate Next
+POST http://localhost:3000/click-navigate
+Content-Type: application/json
+
+{
+  "url": "https://urbania.pe/buscar/alquiler-de-departamentos-en-san-miguel--lima--lima?page=5",
+  "clickSelector": "a[data-qa=PAGING_NEXT]"
+}
+
 ### health
 GET http://localhost:3000/health

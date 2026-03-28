@@ -193,6 +193,77 @@ export async function renderPage(options: RenderOptions): Promise<RenderResult> 
   }
 }
 
+export interface ClickNavigateOptions {
+  url: string;
+  clickSelector: string;
+  timeout: number;
+  includeHtml?: boolean;
+}
+
+export interface ClickNavigateResult {
+  finalUrl: string;
+  html?: string;
+}
+
+export async function clickAndWaitForNavigation(options: ClickNavigateOptions): Promise<ClickNavigateResult> {
+  const browser = await getBrowser();
+
+  const existingContexts = browser.contexts();
+  const context = existingContexts.length > 0 ? existingContexts[0] : await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+  });
+  const isDefaultContext = existingContexts.length > 0;
+  const page = await context.newPage();
+
+  try {
+    await page.goto(options.url, {
+      waitUntil: 'domcontentloaded',
+      timeout: options.timeout,
+    });
+
+    await waitForCloudflare(page, Math.min(15000, options.timeout));
+
+    const initialUrl = page.url();
+
+    const element = await page.waitForSelector(options.clickSelector, {
+      timeout: Math.min(10000, options.timeout),
+    });
+
+    if (!element) {
+      throw new Error(`Element not found: ${options.clickSelector}`);
+    }
+
+    await element.click();
+
+    // Wait for URL to change
+    const deadline = Date.now() + options.timeout;
+    while (Date.now() < deadline) {
+      const currentUrl = page.url();
+      if (currentUrl !== initialUrl) {
+        // Wait a bit for the page to settle after navigation
+        await page.waitForLoadState('domcontentloaded', {
+          timeout: Math.max(deadline - Date.now(), 1000),
+        }).catch(() => {});
+        break;
+      }
+      await page.waitForTimeout(200);
+    }
+
+    const finalUrl = page.url();
+    if (finalUrl === initialUrl) {
+      throw new Error('URL did not change after clicking');
+    }
+
+    const html = options.includeHtml ? await page.content() : undefined;
+    return { finalUrl, html };
+  } finally {
+    await page.close();
+    if (!isDefaultContext) {
+      await context.close();
+    }
+  }
+}
+
 async function autoScroll(page: Page, maxScrolls: number, timeout: number): Promise<void> {
   const deadline = Date.now() + timeout;
 

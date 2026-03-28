@@ -29,6 +29,23 @@ public class PlaywrightClient {
                 .block(Duration.ofSeconds(60));
     }
 
+    public ClickNavigateResponse clickNavigate(ClickNavigateRequest request) {
+        return webClient.post()
+                .uri("/click-navigate")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(ClickNavigateResponse.class)
+                .block(Duration.ofSeconds(60));
+    }
+
+    public record ClickNavigateRequest(String url, String clickSelector, int timeout, boolean includeHtml) {
+        public ClickNavigateRequest(String url, String clickSelector, int timeout) {
+            this(url, clickSelector, timeout, false);
+        }
+    }
+
+    public record ClickNavigateResponse(String finalUrl, String html) {}
+
     public record RenderRequest(
             String url,
             String waitForSelector,

@@ -239,13 +239,13 @@ class RepositoryIntegrationTest {
     }
 
     @Test
-    void findByOrderByExtractedAtDesc_returnsItemsInDescendingOrder() {
+    void findAllWithAssociations_returnsItemsInDescendingOrder() {
         DiscoveredUrl url = saveUrl("https://example.com/p/1", "hash-order", UrlStatus.COMPLETED);
         ExtractedItem item1 = saveExtractedItem(url, "First");
         ExtractedItem item2 = saveExtractedItem(url, "Second");
 
         List<ExtractedItem> items = extractedItemRepository
-                .findByOrderByExtractedAtDesc(PageRequest.of(0, 10));
+                .findAllWithAssociations(PageRequest.of(0, 10));
 
         assertThat(items).hasSizeGreaterThanOrEqualTo(2);
         // Most recently extracted is first
@@ -254,12 +254,12 @@ class RepositoryIntegrationTest {
     }
 
     @Test
-    void findBySiteIdOrderByExtractedAtDesc_filtersBySite() {
+    void findBySiteIdWithAssociations_filtersBySite() {
         DiscoveredUrl url = saveUrl("https://example.com/p/1", "hash-site", UrlStatus.COMPLETED);
         saveExtractedItem(url, "Product For Site");
 
         List<ExtractedItem> items = extractedItemRepository
-                .findBySiteIdOrderByExtractedAtDesc(site.getId(), PageRequest.of(0, 10));
+                .findBySiteIdWithAssociations(site.getId(), PageRequest.of(0, 10));
 
         assertThat(items).isNotEmpty();
         assertThat(items).extracting(i -> i.getSite().getId()).containsOnly(site.getId());

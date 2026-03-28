@@ -15,7 +15,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -101,10 +103,12 @@ public class ListDiscoveryService {
         int pagesVisited = 0;
         int newUrls = 0;
         int knownUrls = 0;
+        Set<String> visitedUrls = new HashSet<>();
 
         log.info("Starting Jsoup discovery for category '{}', url={}", categoryName, currentUrl);
 
         while (currentUrl != null && pagesVisited < maxPages) {
+            visitedUrls.add(currentUrl);
             pagesVisited++;
             pagesVisitedCounter.increment();
             MDC.put("url", currentUrl);
@@ -122,7 +126,15 @@ public class ListDiscoveryService {
             newUrls += counts[0];
             knownUrls += counts[1];
 
-            currentUrl = findNextPageUrl(doc, category.getNextPageSelector());
+            String nextUrl = findNextPageUrl(doc, category.getNextPageSelector());
+            if (nextUrl != null && visitedUrls.contains(nextUrl)) {
+                log.info("Next page URL already visited ({}), using Playwright click from '{}' for category '{}'",
+                        nextUrl, currentUrl, categoryName);
+                String clickSelector = resolveNextPageSelector(doc, category.getNextPageSelector());
+                currentUrl = navigateViaClick(currentUrl, clickSelector, categoryName);
+            } else {
+                currentUrl = nextUrl;
+            }
 
             if (currentUrl != null && pagesVisited < maxPages) {
                 PageFetcher.politenessDelay(politenessDelayMs);
@@ -205,6 +217,42 @@ public class ListDiscoveryService {
         }
 
         return new int[]{newUrls, knownUrls};
+    }
+
+    private String navigateViaClick(String currentUrl, String clickSelector, String categoryName) {
+        if (clickSelector == null) {
+            log.warn("Cannot determine next page selector for click navigation, stopping pagination for '{}'",
+                    categoryName);
+            return null;
+        }
+        try {
+            var response = playwrightClient.clickNavigate(
+                    new PlaywrightClient.ClickNavigateRequest(currentUrl, clickSelector, 30_000));
+            log.info("Playwright click navigated to {} for category '{}'", response.finalUrl(), categoryName);
+            return response.finalUrl();
+        } catch (Exception e) {
+            log.warn("Playwright click navigation failed for category '{}': {}", categoryName, e.getMessage());
+            return null;
+        }
+    }
+
+    private static String resolveNextPageSelector(Document doc, String customSelector) {
+        if (customSelector != null && !customSelector.isBlank()) {
+            return customSelector;
+        }
+        if (doc.selectFirst("a[rel=next]") != null) {
+            return "a[rel=next]";
+        }
+        for (Element a : doc.select("a[href]")) {
+            String text = a.text().trim();
+            if (text.equalsIgnoreCase("Siguiente")
+                    || text.equalsIgnoreCase("Next")
+                    || text.equals("›")
+                    || text.equals("»")) {
+                return "a:text-is(\"" + text + "\")";
+            }
+        }
+        return null;
     }
 
     private String findNextPageUrl(Document doc, String customSelector) {
