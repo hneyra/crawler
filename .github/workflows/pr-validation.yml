@@ -1,0 +1,95 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (Java 25)
+    runs-on: ubuntu-latest
+
+    services:
+      # Testcontainers manages its own Postgres, but Docker must be available
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build (skip tests)
+        run: ./gradlew assemble --no-daemon
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+        env:
+          # Testcontainers uses Docker in Docker — point to the host daemon
+          DOCKER_HOST: tcp://docker:2375
+          TESTCONTAINERS_RYUK_DISABLED: true
+
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_name: Test Results
+          fail_on_failure: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: build/reports/tests/test/
+          retention-days: 7
+
+  lint-migrations:
+    name: Validate Flyway Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check migration naming convention
+        run: |
+          # Migrations must follow V{n}__{description}.sql
+          invalid=$(find src/main/resources/db/migration -name "*.sql" \
+            | grep -vE '/V[0-9]+__[A-Za-z0-9_]+\.sql$' || true)
+          if [ -n "$invalid" ]; then
+            echo "❌ Invalid migration file names:"
+            echo "$invalid"
+            exit 1
+          fi
+          echo "✅ All migration files are correctly named."
+
+      - name: Check for duplicate migration versions
+        run: |
+          duplicates=$(find src/main/resources/db/migration -name "V*.sql" \
+            | sed 's/.*\/V\([0-9]*\)__.*/\1/' \
+            | sort | uniq -d)
+          if [ -n "$duplicates" ]; then
+            echo "❌ Duplicate migration version(s) found: $duplicates"
+            exit 1
+          fi
+          echo "✅ No duplicate migration versions."
