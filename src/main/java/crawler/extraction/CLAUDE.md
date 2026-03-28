@@ -16,8 +16,8 @@ Extracts structured data from discovered product URLs. Processes URLs in batches
 
 | Strategy | Method | How It Works |
 |----------|--------|-------------|
-| `HTML` | `processUrlWithJsoup` | Fetches page via Jsoup, extracts fields using CSS selectors |
-| `SCRIPT_JSON` | `processUrlWithJsoup` | Parses `<script>` tags with regex patterns, extracts via JsonPath |
+| `HTML` | `processUrl` | Fetches page via `PageFetcher`, extracts fields using CSS selectors |
+| `SCRIPT_JSON` | `processUrl` | Parses `<script>` tags with regex patterns, extracts via JsonPath |
 | `AJAX` | `processUrlWithPlaywright` | Renders via Playwright, intercepts network responses, extracts via JsonPath |
 
 ## Data Flow
@@ -25,7 +25,7 @@ Extracts structured data from discovered product URLs. Processes URLs in batches
 1. `processBatch(siteId)` loads site config and fetches up to `extraction-batch-size` PENDING URLs
 2. All URLs marked `IN_PROGRESS` via `saveAll()`
 3. For each URL:
-   - Route to Jsoup or Playwright based on `detailStrategy`
+   - Route to `PageFetcher` or Playwright based on `detailStrategy`
    - Save raw HTML snapshot via `RawStorageService`
    - Extract fields into `Map<String, Object> properties`
    - Extract JSON-LD data if present
@@ -58,5 +58,6 @@ Extracts structured data from discovered product URLs. Processes URLs in batches
 - `crawler.model` — all entities and repositories
 - `crawler.discovery` — `PlaywrightClient` for AJAX strategy
 - `crawler.storage` — `RawStorageService` for snapshots
+- `crawler.support` — `PageFetcher` for HTML/SCRIPT_JSON fetching with Cloudflare fallback
 - `crawler.config` — `CrawlerProperties` (for `extractionBatchSize`)
 - External: Jsoup, Jackson ObjectMapper, JsonPath

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import crawler.config.CrawlerProperties;
-import crawler.discovery.CloudflareDetector;
 import crawler.discovery.PlaywrightClient;
 import crawler.discovery.PlaywrightClient.InterceptedResponse;
 import crawler.discovery.PlaywrightClient.RenderRequest;
@@ -21,6 +20,7 @@ import crawler.model.Site;
 import crawler.model.SiteRepository;
 import crawler.model.UrlStatus;
 import crawler.storage.RawStorageService;
+import crawler.support.PageFetcher;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +49,7 @@ public class DetailExtractionService {
     private final CrawlerProperties crawlerProperties;
     private final ObjectMapper objectMapper;
     private final PlaywrightClient playwrightClient;
+    private final PageFetcher pageFetcher;
 
     public DetailExtractionService(DiscoveredUrlRepository discoveredUrlRepository,
                                    ExtractedItemRepository extractedItemRepository,
@@ -56,7 +57,8 @@ public class DetailExtractionService {
                                    RawStorageService rawStorageService,
                                    CrawlerProperties crawlerProperties,
                                    ObjectMapper objectMapper,
-                                   PlaywrightClient playwrightClient) {
+                                   PlaywrightClient playwrightClient,
+                                   PageFetcher pageFetcher) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.extractedItemRepository = extractedItemRepository;
         this.siteRepository = siteRepository;
@@ -64,6 +66,7 @@ public class DetailExtractionService {
         this.crawlerProperties = crawlerProperties;
         this.objectMapper = objectMapper;
         this.playwrightClient = playwrightClient;
+        this.pageFetcher = pageFetcher;
     }
 
     public void processBatch(Long siteId) {
@@ -118,7 +121,7 @@ public class DetailExtractionService {
                 discoveredUrlRepository.save(discovered);
 
                 if (i < batch.size() - 1) {
-                    sleep(politenessDelayMs);
+                    PageFetcher.politenessDelay(politenessDelayMs);
                 }
             }
         } finally {
@@ -130,7 +133,7 @@ public class DetailExtractionService {
 
     private void processUrl(DiscoveredUrl discovered, Site site,
                             ExtractionConfig config) throws Exception {
-        Document doc = fetchDocument(discovered.getUrl());
+        Document doc = pageFetcher.fetch(discovered.getUrl());
 
         String html = doc.outerHtml();
         String snapshotPath = rawStorageService.saveHtml(html, site.getId(), discovered.getUrl());
@@ -152,36 +155,6 @@ public class DetailExtractionService {
         }
 
         saveExtractedItem(discovered, site, doc, properties, snapshotPath);
-    }
-
-    private Document fetchDocument(String url) throws Exception {
-        // Step 1: Jsoup
-        Document doc;
-        try {
-            doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .timeout(15_000)
-                    .get();
-        } catch (org.jsoup.HttpStatusException e) {
-            if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
-                log.warn("Cloudflare block (HTTP {}), falling back to Playwright: {}", e.getStatusCode(), url);
-                return renderDocument(url);
-            }
-            throw e;
-        }
-
-        if (CloudflareDetector.isCloudflareBlock(doc)) {
-            log.warn("Cloudflare challenge detected, falling back to Playwright: {}", url);
-            return renderDocument(url);
-        }
-
-        return doc;
-    }
-
-    private Document renderDocument(String url) throws Exception {
-        RenderRequest request = RenderRequest.simple(url, 30_000);
-        RenderResponse response = playwrightClient.render(request);
-        return Jsoup.parse(response.html(), url);
     }
 
     private void processUrlWithPlaywright(DiscoveredUrl discovered, Site site,
@@ -325,15 +298,5 @@ public class DetailExtractionService {
 
     private static String sanitizeKey(String url) {
         return url.replaceAll("[^a-zA-Z0-9]", "_");
-
     }
-
-    private void sleep(int millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
 }

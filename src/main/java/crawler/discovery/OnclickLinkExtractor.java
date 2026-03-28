@@ -1,6 +1,6 @@
 package crawler.discovery;
 
-import java.net.URI;
+import crawler.support.UrlUtils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jsoup.nodes.Element;
@@ -25,25 +25,14 @@ public class OnclickLinkExtractor implements LinkExtractor {
 
         Matcher matcher = URL_IN_ONCLICK.matcher(onclick);
         if (matcher.find()) {
-            return resolveUrl(matcher.group(1), baseUrl);
+            return UrlUtils.resolveUrl(matcher.group(1), baseUrl);
         }
 
         matcher = SIMPLE_URL.matcher(onclick);
         if (matcher.find()) {
-            return resolveUrl(matcher.group(1), baseUrl);
+            return UrlUtils.resolveUrl(matcher.group(1), baseUrl);
         }
 
         return "";
-    }
-
-    private String resolveUrl(String url, String baseUrl) {
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            return url;
-        }
-        try {
-            return URI.create(baseUrl).resolve(url).toString();
-        } catch (Exception e) {
-            return "";
-        }
     }
 }

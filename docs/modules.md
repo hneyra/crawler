@@ -29,6 +29,12 @@ graph LR
         FRS[FailedUrlRetryScheduler]
     end
 
+    subgraph "Support Layer"
+        PF[PageFetcher]
+        HU[HashUtils]
+        UU[UrlUtils]
+    end
+
     subgraph "Infrastructure"
         PC[PlaywrightClient]
         REPO[Repositories]
@@ -43,11 +49,16 @@ graph LR
     CJC --> ET --> DES
     SC --> REPO
     FRS --> REPO
-    LDS --> PC
+    LDS --> PF
     LDS --> REPO
+    DES --> PF
     DES --> PC
     DES --> REPO
     DES --> RSS
+    PF --> PC
+    RSS --> HU
+    LDS --> HU
+    LDS --> UU
 ```
 
 ## Detalle por Modulo
@@ -102,6 +113,16 @@ Extrae datos estructurados de cada URL descubierta.
 | Clase | Tipo | Descripcion |
 |-------|------|-------------|
 | `RawStorageService` | `@Service` | Guarda HTML/JSON en `{siteId}/{fecha}/{sha256}.{ext}` |
+
+### `crawler.support` — Utilidades Compartidas
+
+Paquete con utilidades transversales para eliminar duplicacion de codigo entre modulos.
+
+| Clase | Tipo | Descripcion |
+|-------|------|-------------|
+| `HashUtils` | Utility (final) | SHA-256 hashing centralizado, usado por discovery y storage |
+| `UrlUtils` | Utility (final) | Normalizacion de URLs (strip fragment) y resolucion de URLs relativas |
+| `PageFetcher` | `@Component` | Fetch de paginas via Jsoup con deteccion de Cloudflare y fallback automatico a Playwright |
 
 ### `crawler.job` — Batch Jobs y Scheduling
 

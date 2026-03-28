@@ -130,8 +130,8 @@ flowchart LR
 
 | Test | Que Verifica |
 |------|-------------|
-| `normalizeUrl_*` (6 tests) | Normalizacion: fragmentos, query params, whitespace, URLs invalidas |
-| `sha256_*` (4 tests) | Hash deterministico, formato hex 64 chars, valor conocido |
+| `normalizeUrl_*` (6 tests) | Normalizacion via `UrlUtils`: fragmentos, query params, whitespace, URLs invalidas |
+| `sha256_*` (4 tests) | Hash via `HashUtils`: deterministico, formato hex 64 chars, valor conocido |
 | `discoverCategory_usesPlaywright*` | Routing SCROLL_AJAX → Playwright |
 | `discoverCategory_savesNewUrls*` | URLs guardadas con status PENDING |
 | `discoverCategory_skipsDuplicates*` | Deduplicacion por urlHash |

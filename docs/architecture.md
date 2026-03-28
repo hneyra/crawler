@@ -13,6 +13,7 @@ graph TB
         BATCH[Spring Batch Jobs]
         SCHED[Retry Scheduler]
         STOR[Storage Service]
+        SUPPORT[Support Utils<br/>PageFetcher / HashUtils / UrlUtils]
     end
 
     subgraph "Renderer (Node.js)"
@@ -34,8 +35,9 @@ graph TB
     EXTR --> PG
     EXTR --> STOR
     STOR --> FS
-    DISC -->|HTTP| EXPRESS
-    EXTR -->|HTTP| EXPRESS
+    DISC --> SUPPORT
+    EXTR --> SUPPORT
+    SUPPORT -->|HTTP| EXPRESS
     EXPRESS --> PW
     SCHED --> PG
 ```
@@ -52,6 +54,7 @@ El backend es el componente principal que coordina todo el flujo de crawling:
 - **Spring Batch**: Orquesta el pipeline completo (discovery -> extraction) como un job
 - **Retry Scheduler**: Reintenta periodicamente URLs que fallaron
 - **Storage Service**: Persiste snapshots de HTML/JSON en el filesystem
+- **Support Utils**: Utilidades compartidas — `PageFetcher` (fetch con fallback Cloudflare/Playwright), `HashUtils` (SHA-256), `UrlUtils` (normalizacion y resolucion de URLs)
 
 ### Renderer (Node.js + Playwright)
 

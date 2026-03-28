@@ -16,6 +16,9 @@ import crawler.model.DiscoveredUrlRepository;
 import crawler.model.PaginationType;
 import crawler.model.Site;
 import crawler.model.UrlStatus;
+import crawler.support.HashUtils;
+import crawler.support.PageFetcher;
+import crawler.support.UrlUtils;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,11 +40,14 @@ class ListDiscoveryServiceUnitTest {
     @Mock
     private PlaywrightClient playwrightClient;
 
+    @Mock
+    private PageFetcher pageFetcher;
+
     private ListDiscoveryService service;
 
     @BeforeEach
     void setUp() {
-        service = new ListDiscoveryService(discoveredUrlRepository, crawlerProperties, playwrightClient);
+        service = new ListDiscoveryService(discoveredUrlRepository, crawlerProperties, playwrightClient, pageFetcher);
     }
 
     // -------------------------------------------------------------------------
@@ -50,36 +56,36 @@ class ListDiscoveryServiceUnitTest {
 
     @Test
     void normalizeUrl_stripsFragment() {
-        assertThat(ListDiscoveryService.normalizeUrl("https://example.com/product/1#reviews"))
+        assertThat(UrlUtils.normalizeUrl("https://example.com/product/1#reviews"))
                 .isEqualTo("https://example.com/product/1");
     }
 
     @Test
     void normalizeUrl_preservesQueryParameters() {
-        assertThat(ListDiscoveryService.normalizeUrl("https://example.com/product?id=42&ref=home"))
+        assertThat(UrlUtils.normalizeUrl("https://example.com/product?id=42&ref=home"))
                 .isEqualTo("https://example.com/product?id=42&ref=home");
     }
 
     @Test
     void normalizeUrl_stripsFragmentAndKeepsQuery() {
-        assertThat(ListDiscoveryService.normalizeUrl("https://example.com/product?id=1#section"))
+        assertThat(UrlUtils.normalizeUrl("https://example.com/product?id=1#section"))
                 .isEqualTo("https://example.com/product?id=1");
     }
 
     @Test
     void normalizeUrl_tripsLeadingAndTrailingWhitespace() {
-        assertThat(ListDiscoveryService.normalizeUrl("  https://example.com/product  "))
+        assertThat(UrlUtils.normalizeUrl("  https://example.com/product  "))
                 .isEqualTo("https://example.com/product");
     }
 
     @Test
     void normalizeUrl_returnsNullForInvalidUrl() {
-        assertThat(ListDiscoveryService.normalizeUrl("http://[invalid")).isNull();
+        assertThat(UrlUtils.normalizeUrl("http://[invalid")).isNull();
     }
 
     @Test
     void normalizeUrl_handlesSimpleHttpsUrl() {
-        assertThat(ListDiscoveryService.normalizeUrl("https://example.com/"))
+        assertThat(UrlUtils.normalizeUrl("https://example.com/"))
                 .isEqualTo("https://example.com/");
     }
 
@@ -89,26 +95,26 @@ class ListDiscoveryServiceUnitTest {
 
     @Test
     void sha256_producesSixtyFourCharacterHexString() {
-        String hash = ListDiscoveryService.sha256("https://example.com/product/123");
+        String hash = HashUtils.sha256("https://example.com/product/123");
         assertThat(hash).hasSize(64).matches("[0-9a-f]{64}");
     }
 
     @Test
     void sha256_isDeterministic() {
         String url = "https://example.com/product/123";
-        assertThat(ListDiscoveryService.sha256(url)).isEqualTo(ListDiscoveryService.sha256(url));
+        assertThat(HashUtils.sha256(url)).isEqualTo(HashUtils.sha256(url));
     }
 
     @Test
     void sha256_differentInputsProduceDifferentHashes() {
-        assertThat(ListDiscoveryService.sha256("url-a"))
-                .isNotEqualTo(ListDiscoveryService.sha256("url-b"));
+        assertThat(HashUtils.sha256("url-a"))
+                .isNotEqualTo(HashUtils.sha256("url-b"));
     }
 
     @Test
     void sha256_emptyStringProducesKnownHash() {
         // SHA-256 of empty string is well-known
-        assertThat(ListDiscoveryService.sha256(""))
+        assertThat(HashUtils.sha256(""))
                 .isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     }
 

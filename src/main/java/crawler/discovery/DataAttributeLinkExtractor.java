@@ -1,6 +1,6 @@
 package crawler.discovery;
 
-import java.net.URI;
+import crawler.support.UrlUtils;
 import org.jsoup.nodes.Element;
 
 public class DataAttributeLinkExtractor implements LinkExtractor {
@@ -14,20 +14,9 @@ public class DataAttributeLinkExtractor implements LinkExtractor {
 
         String raw = element.attr(linkAttribute);
         if (!raw.isBlank()) {
-            return resolveUrl(raw, baseUrl);
+            return UrlUtils.resolveUrl(raw, baseUrl);
         }
 
         return "";
-    }
-
-    private String resolveUrl(String url, String baseUrl) {
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            return url;
-        }
-        try {
-            return URI.create(baseUrl).resolve(url).toString();
-        } catch (Exception e) {
-            return "";
-        }
     }
 }
