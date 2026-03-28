@@ -10,6 +10,9 @@ import crawler.model.UrlStatus;
 import crawler.support.HashUtils;
 import crawler.support.PageFetcher;
 import crawler.support.UrlUtils;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.Map;
@@ -33,10 +36,17 @@ public class ListDiscoveryService {
     private final PageFetcher pageFetcher;
     private final Map<LinkExtractionType, LinkExtractor> linkExtractors;
 
+    private final Timer discoveryTimer;
+    private final Counter urlsDiscoveredCounter;
+    private final Counter urlsDuplicateCounter;
+    private final Counter discoveryErrorCounter;
+    private final Counter pagesVisitedCounter;
+
     public ListDiscoveryService(DiscoveredUrlRepository discoveredUrlRepository,
                                 CrawlerProperties crawlerProperties,
                                 PlaywrightClient playwrightClient,
-                                PageFetcher pageFetcher) {
+                                PageFetcher pageFetcher,
+                                MeterRegistry registry) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.crawlerProperties = crawlerProperties;
         this.playwrightClient = playwrightClient;
@@ -45,17 +55,37 @@ public class ListDiscoveryService {
         this.linkExtractors.put(LinkExtractionType.HREF, new HrefLinkExtractor());
         this.linkExtractors.put(LinkExtractionType.ONCLICK, new OnclickLinkExtractor());
         this.linkExtractors.put(LinkExtractionType.DATA_ATTRIBUTE, new DataAttributeLinkExtractor());
+
+        this.discoveryTimer = Timer.builder("crawler.discovery.duration")
+                .description("Time spent discovering URLs for a category")
+                .register(registry);
+        this.urlsDiscoveredCounter = Counter.builder("crawler.discovery.urls")
+                .tag("result", "new")
+                .description("Newly discovered URLs")
+                .register(registry);
+        this.urlsDuplicateCounter = Counter.builder("crawler.discovery.urls")
+                .tag("result", "duplicate")
+                .description("Already known URLs encountered during discovery")
+                .register(registry);
+        this.discoveryErrorCounter = Counter.builder("crawler.discovery.errors")
+                .description("Discovery errors")
+                .register(registry);
+        this.pagesVisitedCounter = Counter.builder("crawler.discovery.pages")
+                .description("Pages visited during discovery")
+                .register(registry);
     }
 
     public void discoverCategory(Category category) {
         MDC.put("siteId", String.valueOf(category.getSite().getId()));
         MDC.put("categoryId", String.valueOf(category.getId()));
         try {
-            if (category.getPaginationType() == PaginationType.SCROLL_AJAX) {
-                discoverWithPlaywright(category);
-            } else {
-                discoverWithJsoup(category);
-            }
+            discoveryTimer.record(() -> {
+                if (category.getPaginationType() == PaginationType.SCROLL_AJAX) {
+                    discoverWithPlaywright(category);
+                } else {
+                    discoverWithJsoup(category);
+                }
+            });
         } finally {
             MDC.remove("siteId");
             MDC.remove("categoryId");
@@ -76,12 +106,14 @@ public class ListDiscoveryService {
 
         while (currentUrl != null && pagesVisited < maxPages) {
             pagesVisited++;
+            pagesVisitedCounter.increment();
             MDC.put("url", currentUrl);
 
             Document doc;
             try {
                 doc = pageFetcher.fetch(currentUrl, category.getItemLinkSelector());
             } catch (Exception e) {
+                discoveryErrorCounter.increment();
                 log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage(), e);
                 break;
             }
@@ -117,6 +149,7 @@ public class ListDiscoveryService {
         try {
             response = playwrightClient.render(request);
         } catch (Exception e) {
+            discoveryErrorCounter.increment();
             log.error("Playwright render failed for category '{}': {}",
                     categoryName, e.getMessage());
             return;
@@ -155,6 +188,7 @@ public class ListDiscoveryService {
 
             if (discoveredUrlRepository.findByUrlHash(hash).isPresent()) {
                 knownUrls++;
+                urlsDuplicateCounter.increment();
                 continue;
             }
 
@@ -167,6 +201,7 @@ public class ListDiscoveryService {
             discovered.setCreatedAt(Instant.now());
             discoveredUrlRepository.save(discovered);
             newUrls++;
+            urlsDiscoveredCounter.increment();
         }
 
         return new int[]{newUrls, knownUrls};

@@ -23,7 +23,7 @@ class RawStorageServiceTest {
     void setUp() {
         CrawlerProperties props = new CrawlerProperties();
         props.setRawDataDir(tempDir.toString());
-        service = new RawStorageService(props);
+        service = new RawStorageService(props, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
     // -------------------------------------------------------------------------

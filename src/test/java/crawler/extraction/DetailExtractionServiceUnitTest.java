@@ -65,7 +65,7 @@ class DetailExtractionServiceUnitTest {
         service = new DetailExtractionService(
                 discoveredUrlRepository, extractedItemRepository, siteRepository,
                 rawStorageService, crawlerProperties, new ObjectMapper(), playwrightClient,
-                pageFetcher);
+                pageFetcher, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
     // -------------------------------------------------------------------------

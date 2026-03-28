@@ -15,6 +15,8 @@ public interface DiscoveredUrlRepository extends JpaRepository<DiscoveredUrl, Lo
 
     List<DiscoveredUrl> findByCategory_Site_IdAndStatus(Long siteId, UrlStatus status, Pageable pageable);
 
+    long countByStatus(UrlStatus status);
+
     long countByCategory_Site_IdAndStatus(Long siteId, UrlStatus status);
 
     long countByCategory_Site_Id(Long siteId);

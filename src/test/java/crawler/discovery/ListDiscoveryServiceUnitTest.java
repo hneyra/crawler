@@ -47,7 +47,7 @@ class ListDiscoveryServiceUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new ListDiscoveryService(discoveredUrlRepository, crawlerProperties, playwrightClient, pageFetcher);
+        service = new ListDiscoveryService(discoveredUrlRepository, crawlerProperties, playwrightClient, pageFetcher, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
     // -------------------------------------------------------------------------

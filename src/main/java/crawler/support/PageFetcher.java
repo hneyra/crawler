@@ -4,6 +4,9 @@ import crawler.discovery.CloudflareDetector;
 import crawler.discovery.PlaywrightClient;
 import crawler.discovery.PlaywrightClient.RenderRequest;
 import crawler.discovery.PlaywrightClient.RenderResponse;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
@@ -23,9 +26,21 @@ public class PageFetcher {
     private static final int PLAYWRIGHT_TIMEOUT = 30_000;
 
     private final PlaywrightClient playwrightClient;
+    private final Timer fetchTimer;
+    private final Counter cloudflareFallbackCounter;
+    private final Counter fetchErrorCounter;
 
-    public PageFetcher(PlaywrightClient playwrightClient) {
+    public PageFetcher(PlaywrightClient playwrightClient, MeterRegistry registry) {
         this.playwrightClient = playwrightClient;
+        this.fetchTimer = Timer.builder("crawler.fetch.duration")
+                .description("Time spent fetching a page")
+                .register(registry);
+        this.cloudflareFallbackCounter = Counter.builder("crawler.fetch.cloudflare.fallbacks")
+                .description("Number of Cloudflare fallbacks to Playwright")
+                .register(registry);
+        this.fetchErrorCounter = Counter.builder("crawler.fetch.errors")
+                .description("Page fetch errors")
+                .register(registry);
     }
 
     public Document fetch(String url) throws Exception {
@@ -33,6 +48,10 @@ public class PageFetcher {
     }
 
     public Document fetch(String url, String waitForSelector) throws Exception {
+        return fetchTimer.recordCallable(() -> doFetch(url, waitForSelector));
+    }
+
+    private Document doFetch(String url, String waitForSelector) throws Exception {
         Document doc;
         try {
             doc = Jsoup.connect(url)
@@ -41,14 +60,17 @@ public class PageFetcher {
                     .get();
         } catch (org.jsoup.HttpStatusException e) {
             if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
+                cloudflareFallbackCounter.increment();
                 log.warn("Cloudflare block (HTTP {}), falling back to Playwright: {}",
                         e.getStatusCode(), url);
                 return renderDocument(url, waitForSelector);
             }
+            fetchErrorCounter.increment();
             throw e;
         }
 
         if (CloudflareDetector.isCloudflareBlock(doc)) {
+            cloudflareFallbackCounter.increment();
             log.warn("Cloudflare challenge detected, falling back to Playwright: {}", url);
             return renderDocument(url, waitForSelector);
         }

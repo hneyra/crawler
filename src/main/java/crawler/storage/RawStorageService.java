@@ -2,6 +2,8 @@ package crawler.storage;
 
 import crawler.config.CrawlerProperties;
 import crawler.support.HashUtils;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,17 +18,31 @@ public class RawStorageService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final Path baseDir;
+    private final Counter snapshotsHtmlCounter;
+    private final Counter snapshotsJsonCounter;
 
-    public RawStorageService(CrawlerProperties properties) {
+    public RawStorageService(CrawlerProperties properties, MeterRegistry registry) {
         this.baseDir = Path.of(properties.getRawDataDir());
+        this.snapshotsHtmlCounter = Counter.builder("crawler.storage.snapshots")
+                .tag("type", "html")
+                .description("HTML snapshots saved")
+                .register(registry);
+        this.snapshotsJsonCounter = Counter.builder("crawler.storage.snapshots")
+                .tag("type", "json")
+                .description("JSON snapshots saved")
+                .register(registry);
     }
 
     public String saveHtml(String html, Long siteId, String url) throws IOException {
-        return save(html, siteId, url, ".html");
+        String path = save(html, siteId, url, ".html");
+        snapshotsHtmlCounter.increment();
+        return path;
     }
 
     public String saveJson(String json, Long siteId, String url) throws IOException {
-        return save(json, siteId, url, ".json");
+        String path = save(json, siteId, url, ".json");
+        snapshotsJsonCounter.increment();
+        return path;
     }
 
     private String save(String content, Long siteId, String url, String extension) throws IOException {

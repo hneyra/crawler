@@ -21,6 +21,9 @@ import crawler.model.SiteRepository;
 import crawler.model.UrlStatus;
 import crawler.storage.RawStorageService;
 import crawler.support.PageFetcher;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +54,11 @@ public class DetailExtractionService {
     private final PlaywrightClient playwrightClient;
     private final PageFetcher pageFetcher;
 
+    private final Timer extractionBatchTimer;
+    private final Timer extractionUrlTimer;
+    private final Counter extractionSuccessCounter;
+    private final Counter extractionFailureCounter;
+
     public DetailExtractionService(DiscoveredUrlRepository discoveredUrlRepository,
                                    ExtractedItemRepository extractedItemRepository,
                                    SiteRepository siteRepository,
@@ -58,7 +66,8 @@ public class DetailExtractionService {
                                    CrawlerProperties crawlerProperties,
                                    ObjectMapper objectMapper,
                                    PlaywrightClient playwrightClient,
-                                   PageFetcher pageFetcher) {
+                                   PageFetcher pageFetcher,
+                                   MeterRegistry registry) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.extractedItemRepository = extractedItemRepository;
         this.siteRepository = siteRepository;
@@ -67,6 +76,21 @@ public class DetailExtractionService {
         this.objectMapper = objectMapper;
         this.playwrightClient = playwrightClient;
         this.pageFetcher = pageFetcher;
+
+        this.extractionBatchTimer = Timer.builder("crawler.extraction.batch.duration")
+                .description("Time spent processing an extraction batch")
+                .register(registry);
+        this.extractionUrlTimer = Timer.builder("crawler.extraction.url.duration")
+                .description("Time spent extracting a single URL")
+                .register(registry);
+        this.extractionSuccessCounter = Counter.builder("crawler.extraction.urls")
+                .tag("result", "success")
+                .description("Successfully extracted URLs")
+                .register(registry);
+        this.extractionFailureCounter = Counter.builder("crawler.extraction.urls")
+                .tag("result", "failure")
+                .description("Failed URL extractions")
+                .register(registry);
     }
 
     public void processBatch(Long siteId) {
@@ -94,36 +118,46 @@ public class DetailExtractionService {
 
         MDC.put("siteId", String.valueOf(siteId));
         try {
-            log.info("Processing batch of {} URLs for site '{}'", batch.size(), site.getName());
+            extractionBatchTimer.record(() -> {
+                log.info("Processing batch of {} URLs for site '{}'", batch.size(), site.getName());
 
-            ExtractionConfig config = site.getExtractionConfig();
-            int politenessDelayMs = site.getPolitenessDelayMs();
-            DetailStrategy strategy = config != null ? config.getDetailStrategy() : null;
+                ExtractionConfig config = site.getExtractionConfig();
+                int politenessDelayMs = site.getPolitenessDelayMs();
+                DetailStrategy strategy = config != null ? config.getDetailStrategy() : null;
 
-            for (int i = 0; i < batch.size(); i++) {
-                DiscoveredUrl discovered = batch.get(i);
-                MDC.put("categoryId", String.valueOf(discovered.getCategory().getId()));
-                MDC.put("url", discovered.getUrl());
-                try {
-                    if (strategy == DetailStrategy.AJAX) {
-                        processUrlWithPlaywright(discovered, site, config);
-                    } else {
-                        processUrl(discovered, site, config);
+                for (int i = 0; i < batch.size(); i++) {
+                    DiscoveredUrl discovered = batch.get(i);
+                    MDC.put("categoryId", String.valueOf(discovered.getCategory().getId()));
+                    MDC.put("url", discovered.getUrl());
+                    try {
+                        extractionUrlTimer.record(() -> {
+                            try {
+                                if (strategy == DetailStrategy.AJAX) {
+                                    processUrlWithPlaywright(discovered, site, config);
+                                } else {
+                                    processUrl(discovered, site, config);
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                        discovered.setStatus(UrlStatus.COMPLETED);
+                        extractionSuccessCounter.increment();
+                        log.info("Extracted successfully");
+                    } catch (Exception e) {
+                        discovered.setStatus(UrlStatus.FAILED);
+                        discovered.setRetryCount(discovered.getRetryCount() + 1);
+                        extractionFailureCounter.increment();
+                        log.error("Extraction failed: {}", e.getMessage());
                     }
-                    discovered.setStatus(UrlStatus.COMPLETED);
-                    log.info("Extracted successfully");
-                } catch (Exception e) {
-                    discovered.setStatus(UrlStatus.FAILED);
-                    discovered.setRetryCount(discovered.getRetryCount() + 1);
-                    log.error("Extraction failed: {}", e.getMessage());
-                }
-                discovered.setLastAttemptAt(Instant.now());
-                discoveredUrlRepository.save(discovered);
+                    discovered.setLastAttemptAt(Instant.now());
+                    discoveredUrlRepository.save(discovered);
 
-                if (i < batch.size() - 1) {
-                    PageFetcher.politenessDelay(politenessDelayMs);
+                    if (i < batch.size() - 1) {
+                        PageFetcher.politenessDelay(politenessDelayMs);
+                    }
                 }
-            }
+            });
         } finally {
             MDC.remove("siteId");
             MDC.remove("categoryId");
