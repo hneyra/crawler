@@ -84,10 +84,10 @@ public class StatsController {
 
         List<ExtractedItem> items;
         if (siteId != null) {
-            items = extractedItemRepository.findBySiteIdOrderByExtractedAtDesc(
+            items = extractedItemRepository.findBySiteIdWithAssociations(
                     siteId, PageRequest.of(0, limit));
         } else {
-            items = extractedItemRepository.findByOrderByExtractedAtDesc(
+            items = extractedItemRepository.findAllWithAssociations(
                     PageRequest.of(0, limit));
         }
 
