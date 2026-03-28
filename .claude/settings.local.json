@@ -25,7 +25,8 @@
       "Bash(echo \"DISPLAY=$DISPLAY\")",
       "Bash(npx tsc:*)",
       "Bash(curl -s -X POST http://localhost:3000/render -H 'Content-Type: application/json' -d '{\"\"\"\"url\"\"\"\":\"\"\"\"https://www.adondevivir.com/casas-o-departamentos-o-terrenos-o-oficinas-o-locales-comerciales-en-alquiler-en-san-miguel.html\"\"\"\",\"\"\"\"timeout\"\"\"\":30000}')",
-      "Bash(curl -s http://127.0.0.1:9222/json/version)"
+      "Bash(curl -s http://127.0.0.1:9222/json/version)",
+      "Bash(npx vite:*)"
     ]
   }
 }
