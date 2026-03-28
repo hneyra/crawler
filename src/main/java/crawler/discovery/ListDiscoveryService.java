@@ -7,13 +7,11 @@ import crawler.model.DiscoveredUrlRepository;
 import crawler.model.LinkExtractionType;
 import crawler.model.PaginationType;
 import crawler.model.UrlStatus;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import crawler.support.HashUtils;
+import crawler.support.PageFetcher;
+import crawler.support.UrlUtils;
 import java.time.Instant;
 import java.util.EnumMap;
-import java.util.HexFormat;
 import java.util.Map;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -32,14 +30,17 @@ public class ListDiscoveryService {
     private final DiscoveredUrlRepository discoveredUrlRepository;
     private final CrawlerProperties crawlerProperties;
     private final PlaywrightClient playwrightClient;
+    private final PageFetcher pageFetcher;
     private final Map<LinkExtractionType, LinkExtractor> linkExtractors;
 
     public ListDiscoveryService(DiscoveredUrlRepository discoveredUrlRepository,
                                 CrawlerProperties crawlerProperties,
-                                PlaywrightClient playwrightClient) {
+                                PlaywrightClient playwrightClient,
+                                PageFetcher pageFetcher) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.crawlerProperties = crawlerProperties;
         this.playwrightClient = playwrightClient;
+        this.pageFetcher = pageFetcher;
         this.linkExtractors = new EnumMap<>(LinkExtractionType.class);
         this.linkExtractors.put(LinkExtractionType.HREF, new HrefLinkExtractor());
         this.linkExtractors.put(LinkExtractionType.ONCLICK, new OnclickLinkExtractor());
@@ -79,7 +80,7 @@ public class ListDiscoveryService {
 
             Document doc;
             try {
-                doc = fetchDocument(currentUrl, category.getItemLinkSelector());
+                doc = pageFetcher.fetch(currentUrl, category.getItemLinkSelector());
             } catch (Exception e) {
                 log.error("Failed to fetch page for category '{}': {}", categoryName, e.getMessage(), e);
                 break;
@@ -92,7 +93,7 @@ public class ListDiscoveryService {
             currentUrl = findNextPageUrl(doc, category.getNextPageSelector());
 
             if (currentUrl != null && pagesVisited < maxPages) {
-                sleep(politenessDelayMs);
+                PageFetcher.politenessDelay(politenessDelayMs);
             }
         }
 
@@ -130,36 +131,6 @@ public class ListDiscoveryService {
                 categoryName, counts[0], counts[1]);
     }
 
-    private Document fetchDocument(String url, String itemLinkSelector) throws Exception {
-        // Step 1: Jsoup
-        Document doc;
-        try {
-            doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .timeout(15_000)
-                    .get();
-        } catch (org.jsoup.HttpStatusException e) {
-            if (CloudflareDetector.isCloudflareStatusCode(e.getStatusCode())) {
-                log.warn("Cloudflare block (HTTP {}), falling back to Playwright: {}", e.getStatusCode(), url);
-                return renderDocument(url, itemLinkSelector);
-            }
-            throw e;
-        }
-
-        if (CloudflareDetector.isCloudflareBlock(doc)) {
-            log.warn("Cloudflare challenge detected, falling back to Playwright: {}", url);
-            return renderDocument(url, itemLinkSelector);
-        }
-
-        return doc;
-    }
-
-    private Document renderDocument(String url, String waitForSelector) throws Exception {
-        PlaywrightClient.RenderRequest request = PlaywrightClient.RenderRequest.simple(url, waitForSelector, 30_000);
-        PlaywrightClient.RenderResponse response = playwrightClient.render(request);
-        return Jsoup.parse(response.html(), url);
-    }
-
     private int[] extractLinks(Document doc, Category category) {
         int newUrls = 0;
         int knownUrls = 0;
@@ -175,12 +146,12 @@ public class ListDiscoveryService {
                 continue;
             }
 
-            String normalized = normalizeUrl(url);
+            String normalized = UrlUtils.normalizeUrl(url);
             if (normalized == null) {
                 continue;
             }
 
-            String hash = sha256(normalized);
+            String hash = HashUtils.sha256(normalized);
 
             if (discoveredUrlRepository.findByUrlHash(hash).isPresent()) {
                 knownUrls++;
@@ -233,40 +204,6 @@ public class ListDiscoveryService {
         }
 
         return null;
-    }
-
-    static String normalizeUrl(String raw) {
-        try {
-            URI uri = URI.create(raw.trim());
-            URI normalized = new URI(
-                    uri.getScheme(),
-                    uri.getAuthority(),
-                    uri.getPath(),
-                    uri.getQuery(),
-                    null
-            );
-            return normalized.toString();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public static String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
-
-    private void sleep(int millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 
 }

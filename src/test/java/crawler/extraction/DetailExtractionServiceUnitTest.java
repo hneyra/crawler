@@ -21,6 +21,7 @@ import crawler.model.Site;
 import crawler.model.SiteRepository;
 import crawler.model.UrlStatus;
 import crawler.storage.RawStorageService;
+import crawler.support.PageFetcher;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -54,13 +55,17 @@ class DetailExtractionServiceUnitTest {
     @Mock
     private PlaywrightClient playwrightClient;
 
+    @Mock
+    private PageFetcher pageFetcher;
+
     private DetailExtractionService service;
 
     @BeforeEach
     void setUp() {
         service = new DetailExtractionService(
                 discoveredUrlRepository, extractedItemRepository, siteRepository,
-                rawStorageService, crawlerProperties, new ObjectMapper(), playwrightClient);
+                rawStorageService, crawlerProperties, new ObjectMapper(), playwrightClient,
+                pageFetcher);
     }
 
     // -------------------------------------------------------------------------

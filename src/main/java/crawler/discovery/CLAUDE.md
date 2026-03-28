@@ -26,7 +26,8 @@ Discovers product/item URLs from category listing pages. Two strategies based on
 
 ## Important Details
 
-- `normalizeUrl(String)` is **package-private static** and `sha256(String)` is **public static** — both directly testable
+- URL normalization via `UrlUtils.normalizeUrl()` and hashing via `HashUtils.sha256()` (from `crawler.support`)
+- Page fetching with Cloudflare fallback delegated to `PageFetcher` (from `crawler.support`)
 - `findNextPageUrl` checks in order: custom `nextPageSelector`, `a[rel=next]`, heuristic text matching ("Next", "Siguiente", "›", "»")
 - `PlaywrightClient` uses records: `RenderRequest`, `RenderResponse`, `InterceptedResponse`
 - `PlaywrightClient.RenderRequest` has factory methods: `scrolling()`, `withIntercept()`, `scrollingWithIntercept()`
@@ -34,11 +35,12 @@ Discovers product/item URLs from category listing pages. Two strategies based on
 
 ## Testing
 
-- **Unit tests** (`ListDiscoveryServiceUnitTest`): tests static methods, Playwright routing, URL save/dedup logic using Mockito
+- **Unit tests** (`ListDiscoveryServiceUnitTest`): tests `UrlUtils.normalizeUrl()` and `HashUtils.sha256()`, Playwright routing, URL save/dedup logic using Mockito
 - **Integration tests** (`ListDiscoveryIntegrationTest`): full flow with WireMock serving HTML pages + Testcontainers PostgreSQL
 
 ## Dependencies
 
 - `crawler.model` — `Category`, `DiscoveredUrl`, `DiscoveredUrlRepository`, `PaginationType`, `UrlStatus`
 - `crawler.config` — `CrawlerProperties` (for `discoveryMaxPages`)
+- `crawler.support` — `PageFetcher`, `HashUtils`, `UrlUtils`
 - External: Jsoup, Spring WebFlux (WebClient)

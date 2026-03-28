@@ -38,7 +38,7 @@ Both return relative path string (e.g., `1/2024-06-15/abc123...def.html`).
 - Writing the same URL twice on the same day **overwrites** the previous file (same path)
 - Different sites create separate directory trees (siteId prefix)
 - Uses `Files.createDirectories()` — safe for concurrent creation
-- SHA-256 implementation is local to this class (duplicated from `ListDiscoveryService`)
+- SHA-256 hashing delegated to `HashUtils.sha256()` from `crawler.support`
 - `raw-data-dir` comes from `CrawlerProperties.rawDataDir`
 
 ## Testing
@@ -48,4 +48,5 @@ Both return relative path string (e.g., `1/2024-06-15/abc123...def.html`).
 ## Dependencies
 
 - `crawler.config` — `CrawlerProperties` (for `rawDataDir`)
+- `crawler.support` — `HashUtils` (for SHA-256)
 - No external dependencies beyond `java.nio`

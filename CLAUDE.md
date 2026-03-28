@@ -49,6 +49,7 @@ docker-compose up -d
 | `crawler.job` | Spring Batch job config, tasklets, scheduler, REST controllers |
 | `crawler.config` | App properties, async config, YAML site loader |
 | `crawler.model` | JPA entities, enums, Spring Data repositories |
+| `crawler.support` | Shared utilities: `HashUtils`, `UrlUtils`, `PageFetcher` |
 
 ### Architecture Patterns
 
@@ -57,6 +58,7 @@ docker-compose up -d
 - **Spring Batch**: Orchestrates crawl jobs with `DiscoveryTasklet` -> `ExtractionTasklet`
 - **Async execution**: `@Async` launchers + configurable thread pools for non-blocking REST triggers
 - **URL deduplication**: SHA-256 hash of normalized URL stored in `discovered_url.url_hash` (unique index)
+- **Shared utilities**: `PageFetcher` centralizes Jsoup+Cloudflare+Playwright fallback; `HashUtils` and `UrlUtils` eliminate duplication
 
 ### Database Schema
 

@@ -1,15 +1,13 @@
 package crawler.storage;
 
 import crawler.config.CrawlerProperties;
+import crawler.support.HashUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HexFormat;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -33,7 +31,7 @@ public class RawStorageService {
 
     private String save(String content, Long siteId, String url, String extension) throws IOException {
         String dateDir = LocalDate.now().format(DATE_FMT);
-        String hash = sha256(url);
+        String hash = HashUtils.sha256(url);
         String fileName = hash + extension;
 
         Path relativePath = Path.of(siteId.toString(), dateDir, fileName);
@@ -44,15 +42,4 @@ public class RawStorageService {
 
         return relativePath.toString().replace('\\', '/');
     }
-
-    private static String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
-
 }

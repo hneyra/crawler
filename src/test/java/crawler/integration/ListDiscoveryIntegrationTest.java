@@ -13,6 +13,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import crawler.config.DataInitializer;
 import crawler.discovery.ListDiscoveryService;
 import crawler.discovery.PlaywrightClient;
+import crawler.support.HashUtils;
 import crawler.model.Category;
 import crawler.model.CategoryRepository;
 import crawler.model.DiscoveredUrlRepository;
@@ -208,7 +209,7 @@ class ListDiscoveryIntegrationTest {
         listDiscoveryService.discoverCategory(category);
 
         String expectedUrl = wireMock.baseUrl() + productPath;
-        String expectedHash = ListDiscoveryService.sha256(expectedUrl);
+        String expectedHash = HashUtils.sha256(expectedUrl);
 
         assertThat(discoveredUrlRepository.findByUrlHash(expectedHash)).isPresent();
     }
