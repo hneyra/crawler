@@ -1,0 +1,17 @@
+metrics:
+  global:
+    scrape_interval: 30s
+  configs:
+    - name: crawler
+      scrape_configs:
+        - job_name: crawler
+          metrics_path: /actuator/prometheus
+          static_configs:
+            - targets: ['host.docker.internal:8080']
+              labels:
+                application: crawler
+      remote_write:
+        - url: https://prometheus-prod-XX-prod-XX-X.grafana.net/api/prom/push
+          basic_auth:
+            username: "<GRAFANA_CLOUD_METRICS_USER_ID>"
+            password: "<GRAFANA_CLOUD_API_KEY>"

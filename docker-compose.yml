@@ -20,5 +20,16 @@ services:
       PORT: "3000"
       DEFAULT_TIMEOUT: "30000"
 
+  grafana-agent:
+    image: grafana/agent:latest
+    container_name: crawler-grafana-agent
+    volumes:
+      - ./grafana-agent.yml:/etc/agent/config.yml
+    command:
+      - -config.file=/etc/agent/config.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: []
+
 volumes:
   crawler-pgdata:
