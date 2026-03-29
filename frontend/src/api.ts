@@ -1,4 +1,4 @@
-import type { Site, Category, SiteStats, ExtractedItem, JobResponse, JobStatus } from './types'
+import type { Site, Category, SiteStats, ExtractedItem, PagedResult, JobResponse, JobStatus } from './types'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -31,10 +31,13 @@ export const deleteCategory = (id: number) => request<void>(`/api/categories/${i
 
 // Stats
 export const getSiteStats = (id: number) => request<SiteStats>(`/api/stats/site/${id}`)
-export const getItems = (limit = 50, siteId?: number) => {
-  let url = `/api/stats/items?limit=${limit}`
-  if (siteId) url += `&siteId=${siteId}`
-  return request<ExtractedItem[]>(url)
+export const getItems = (params: { page?: number; size?: number; siteId?: number; search?: string } = {}) => {
+  const p = new URLSearchParams()
+  p.set('page', String(params.page ?? 0))
+  p.set('size', String(params.size ?? 25))
+  if (params.siteId) p.set('siteId', String(params.siteId))
+  if (params.search) p.set('search', params.search)
+  return request<PagedResult<ExtractedItem>>(`/api/stats/items?${p}`)
 }
 
 // Actions

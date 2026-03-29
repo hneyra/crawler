@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -78,20 +79,19 @@ public class StatsController {
     }
 
     @GetMapping("/items")
-    public List<Map<String, Object>> recentItems(
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestParam(required = false) Long siteId) {
+    public Map<String, Object> recentItems(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) String search) {
 
-        List<ExtractedItem> items;
-        if (siteId != null) {
-            items = extractedItemRepository.findBySiteIdWithAssociations(
-                    siteId, PageRequest.of(0, limit));
-        } else {
-            items = extractedItemRepository.findAllWithAssociations(
-                    PageRequest.of(0, limit));
-        }
+        String searchParam = (search != null && !search.isBlank())
+                ? "%" + search.trim().toLowerCase() + "%" : null;
 
-        return items.stream().map(item -> {
+        Page<ExtractedItem> result = extractedItemRepository.searchItems(
+                siteId, searchParam, PageRequest.of(page, size));
+
+        List<Map<String, Object>> content = result.getContent().stream().map(item -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", item.getId());
             m.put("title", item.getTitle());
@@ -102,6 +102,14 @@ public class StatsController {
             m.put("properties", item.getProperties());
             return m;
         }).toList();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("content", content);
+        response.put("page", result.getNumber());
+        response.put("size", result.getSize());
+        response.put("totalElements", result.getTotalElements());
+        response.put("totalPages", result.getTotalPages());
+        return response;
     }
 
 }

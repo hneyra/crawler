@@ -51,6 +51,14 @@ export interface ExtractedItem {
   properties: string
 }
 
+export interface PagedResult<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export interface JobResponse {
   jobExecutionId: number
   status: string

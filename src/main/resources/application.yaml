@@ -6,14 +6,14 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/crawler
-    username: postgres
-    password: postgres
+    username: crawler
+    password: crawler
 
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: none
     open-in-view: false
     properties:
       hibernate:
@@ -27,13 +27,22 @@ spring:
     jdbc:
       initialize-schema: always
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: crawler
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [siteId=%X{siteId:-} categoryId=%X{categoryId:-} url=%X{url:-}] %logger{36} - %msg%n"
 
 crawler:
-#  raw-data-dir: ${user.home}/crawler-data/
-  raw-data-dir: E:/crawler-data/
+  raw-data-dir: ${user.home}/tmp/crawler-data/
+#  raw-data-dir: file:///E:/crawler-data/
   discovery-max-pages: 50
   extraction-batch-size: 10
   renderer-base-url: http://localhost:3000
