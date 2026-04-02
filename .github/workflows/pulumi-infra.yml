@@ -1,0 +1,121 @@
+name: Pulumi Infra
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'infra/postgres.ts'
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: 'Pulumi stack name'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, staging, prod]
+
+permissions:
+  contents: write   # needed to commit Pulumi.*.yaml back to the branch
+
+env:
+  PULUMI_STACK: ${{ github.event.inputs.stack || 'dev' }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Generate passwords and commit Pulumi.<stack>.yaml
+  # Runs only when postgres.ts changes. Idempotent: skips keys already set.
+  # ─────────────────────────────────────────────────────────────────────────────
+  setup-passwords:
+    name: Setup Pulumi Passwords
+    runs-on: ubuntu-latest
+
+    outputs:
+      stack: ${{ env.PULUMI_STACK }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Use a PAT so the commit pushed back triggers downstream workflows.
+          # Falls back to GITHUB_TOKEN (push won't re-trigger workflows).
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: infra/package-lock.json
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v5
+        with:
+          pulumi-version: latest
+
+      - name: Install infra dependencies
+        run: npm ci
+        working-directory: infra
+
+      - name: Generate passwords (idempotent)
+        run: npx ts-node setup-passwords.ts ${{ env.PULUMI_STACK }}
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+      - name: Commit Pulumi config files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add infra/Pulumi.*.yaml
+          if git diff --staged --quiet; then
+            echo "No changes to Pulumi config — skipping commit."
+          else
+            git commit -m "chore: update Pulumi password config [skip ci]"
+            git push origin HEAD
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Run pulumi up (depends on setup-passwords)
+  # ─────────────────────────────────────────────────────────────────────────────
+  pulumi-up:
+    name: Pulumi Up
+    runs-on: ubuntu-latest
+    needs: setup-passwords
+    environment: ${{ needs.setup-passwords.outputs.stack }}
+
+    steps:
+      - name: Checkout (with latest committed config)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: infra/package-lock.json
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v5
+        with:
+          pulumi-version: latest
+
+      - name: Install infra dependencies
+        run: npm ci
+        working-directory: infra
+
+      - name: Pulumi up
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ needs.setup-passwords.outputs.stack }}
+          work-dir: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          # PostgreSQL provider connection (target server must be reachable)
+          PGHOST:     ${{ secrets.PGHOST }}
+          PGPORT:     ${{ secrets.PGPORT || '5432' }}
+          PGUSER:     ${{ secrets.PGUSER }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          PGSSLMODE:  ${{ secrets.PGSSLMODE || 'require' }}
