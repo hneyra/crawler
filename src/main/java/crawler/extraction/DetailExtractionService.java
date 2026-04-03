@@ -10,6 +10,8 @@ import crawler.discovery.PlaywrightClient;
 import crawler.discovery.PlaywrightClient.InterceptedResponse;
 import crawler.discovery.PlaywrightClient.RenderRequest;
 import crawler.discovery.PlaywrightClient.RenderResponse;
+import crawler.model.ContentChange;
+import crawler.model.ContentChangeRepository;
 import crawler.model.DetailStrategy;
 import crawler.model.DiscoveredUrl;
 import crawler.model.DiscoveredUrlRepository;
@@ -20,6 +22,7 @@ import crawler.model.Site;
 import crawler.model.SiteRepository;
 import crawler.model.UrlStatus;
 import crawler.storage.RawStorageService;
+import crawler.support.HashUtils;
 import crawler.support.PageFetcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,6 +31,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
@@ -47,6 +51,7 @@ public class DetailExtractionService {
 
     private final DiscoveredUrlRepository discoveredUrlRepository;
     private final ExtractedItemRepository extractedItemRepository;
+    private final ContentChangeRepository contentChangeRepository;
     private final SiteRepository siteRepository;
     private final RawStorageService rawStorageService;
     private final CrawlerProperties crawlerProperties;
@@ -61,6 +66,7 @@ public class DetailExtractionService {
 
     public DetailExtractionService(DiscoveredUrlRepository discoveredUrlRepository,
                                    ExtractedItemRepository extractedItemRepository,
+                                   ContentChangeRepository contentChangeRepository,
                                    SiteRepository siteRepository,
                                    RawStorageService rawStorageService,
                                    CrawlerProperties crawlerProperties,
@@ -70,6 +76,7 @@ public class DetailExtractionService {
                                    MeterRegistry registry) {
         this.discoveredUrlRepository = discoveredUrlRepository;
         this.extractedItemRepository = extractedItemRepository;
+        this.contentChangeRepository = contentChangeRepository;
         this.siteRepository = siteRepository;
         this.rawStorageService = rawStorageService;
         this.crawlerProperties = crawlerProperties;
@@ -245,14 +252,48 @@ public class DetailExtractionService {
                 ? properties.get("title").toString()
                 : doc.title();
 
-        ExtractedItem item = new ExtractedItem();
-        item.setDiscoveredUrl(discovered);
-        item.setSite(site);
-        item.setTitle(title);
-        item.setProperties(objectMapper.writeValueAsString(properties));
-        item.setRawSnapshotPath(snapshotPath);
-        item.setExtractedAt(Instant.now());
-        extractedItemRepository.save(item);
+        String propertiesJson = objectMapper.writeValueAsString(properties);
+        String contentHash = HashUtils.sha256(propertiesJson);
+
+        Optional<ExtractedItem> existing = extractedItemRepository
+                .findFirstByDiscoveredUrlIdOrderByExtractedAtDesc(discovered.getId());
+
+        if (existing.isPresent()) {
+            ExtractedItem item = existing.get();
+            String previousHash = item.getContentHash();
+            if (contentHash.equals(previousHash)) {
+                log.debug("No content change detected, skipping save");
+                return;
+            }
+
+            ContentChange change = new ContentChange();
+            change.setDiscoveredUrl(discovered);
+            change.setSite(site);
+            change.setContentHash(contentHash);
+            change.setPreviousHash(previousHash);
+            change.setProperties(propertiesJson);
+            change.setRawSnapshotPath(snapshotPath);
+            change.setDetectedAt(Instant.now());
+            contentChangeRepository.save(change);
+
+            item.setTitle(title);
+            item.setProperties(propertiesJson);
+            item.setRawSnapshotPath(snapshotPath);
+            item.setContentHash(contentHash);
+            item.setExtractedAt(Instant.now());
+            extractedItemRepository.save(item);
+            log.info("Content change detected and recorded");
+        } else {
+            ExtractedItem item = new ExtractedItem();
+            item.setDiscoveredUrl(discovered);
+            item.setSite(site);
+            item.setTitle(title);
+            item.setProperties(propertiesJson);
+            item.setRawSnapshotPath(snapshotPath);
+            item.setContentHash(contentHash);
+            item.setExtractedAt(Instant.now());
+            extractedItemRepository.save(item);
+        }
     }
 
     private void extractFromHtml(Document doc, Map<String, String> fieldSelectors,

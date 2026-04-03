@@ -28,4 +28,8 @@ public interface DiscoveredUrlRepository extends JpaRepository<DiscoveredUrl, Lo
 
     @Query("SELECT MAX(d.lastAttemptAt) FROM DiscoveredUrl d WHERE d.category.site.id = :siteId")
     Optional<java.time.Instant> findLastAttemptBySiteId(Long siteId);
+
+    @Modifying
+    @Query("UPDATE DiscoveredUrl d SET d.status = 'PENDING' WHERE d.status = 'COMPLETED' AND d.category.site.id = :siteId")
+    int resetCompletedUrlsBySiteId(Long siteId);
 }

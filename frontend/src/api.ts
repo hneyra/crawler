@@ -40,6 +40,12 @@ export const getItems = (params: { page?: number; size?: number; siteId?: number
   return request<PagedResult<ExtractedItem>>(`/api/stats/items?${p}`)
 }
 
+// Items
+export const getItemImages = (id: number) => request<string[]>(`/api/items/${id}/images`)
+export const downloadItemImages = (id: number) => {
+  window.open(`/api/items/${id}/download-images`, '_blank')
+}
+
 // Actions
 export const launchCrawl = (siteId: number) => request<JobResponse>(`/api/jobs/crawl/${siteId}`, { method: 'POST' })
 export const getJobStatus = (jobId: number) => request<JobStatus>(`/api/jobs/status/${jobId}`)

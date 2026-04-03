@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getSites, getItems } from '../api'
+import { getSites, getItems, getItemImages, downloadItemImages } from '../api'
 import { ToastContext } from '../App'
 import type { Site, ExtractedItem, PagedResult } from '../types'
 
@@ -50,6 +50,8 @@ export default function ItemsPage() {
   const [pageSize] = useState(25)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [imageCount, setImageCount] = useState<Record<number, number | null>>({})
+  const [downloadingId, setDownloadingId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,6 +83,22 @@ export default function ItemsPage() {
   const handleSiteChange = (val: number | '') => {
     setPage(0)
     setSiteFilter(val)
+  }
+
+  const checkImages = async (id: number) => {
+    if (imageCount[id] !== undefined) return
+    try {
+      const urls = await getItemImages(id)
+      setImageCount(prev => ({ ...prev, [id]: urls.length }))
+    } catch {
+      setImageCount(prev => ({ ...prev, [id]: 0 }))
+    }
+  }
+
+  const handleDownloadImages = (id: number) => {
+    setDownloadingId(id)
+    downloadItemImages(id)
+    setTimeout(() => setDownloadingId(null), 2000)
   }
 
   const items = result?.content ?? []
@@ -140,6 +158,7 @@ export default function ItemsPage() {
                   <th>URL</th>
                   <th>Sitio</th>
                   <th>Extraido</th>
+                  <th>Imagenes</th>
                   <th>Propiedades</th>
                 </tr>
               </thead>
@@ -157,6 +176,22 @@ export default function ItemsPage() {
                       </td>
                       <td>{item.siteName}</td>
                       <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(item.extractedAt).toLocaleString()}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {imageCount[item.id] === undefined ? (
+                          <button className="btn btn-sm btn-outline"
+                            onClick={() => checkImages(item.id)}>
+                            Verificar
+                          </button>
+                        ) : imageCount[item.id] === 0 ? (
+                          <span style={{ color: '#9ca3af', fontSize: 12 }}>Sin imagenes</span>
+                        ) : (
+                          <button className="btn btn-sm btn-primary"
+                            disabled={downloadingId === item.id}
+                            onClick={() => handleDownloadImages(item.id)}>
+                            {downloadingId === item.id ? 'Descargando...' : `Descargar (${imageCount[item.id]})`}
+                          </button>
+                        )}
+                      </td>
                       <td style={{ fontSize: 12, minWidth: 280 }}>
                         {keyCount === 0 ? (
                           <span style={{ color: '#9ca3af' }}>-</span>

@@ -14,8 +14,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "extracted_item")
-public class ExtractedItem {
+@Table(name = "content_change")
+public class ContentChange {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,8 +29,11 @@ public class ExtractedItem {
     @JoinColumn(name = "site_id", nullable = false)
     private Site site;
 
-    @Column(nullable = false)
-    private String title;
+    @Column(name = "content_hash", nullable = false, length = 64)
+    private String contentHash;
+
+    @Column(name = "previous_hash", length = 64)
+    private String previousHash;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -39,18 +42,11 @@ public class ExtractedItem {
     @Column(name = "raw_snapshot_path")
     private String rawSnapshotPath;
 
-    @Column(name = "content_hash", length = 64)
-    private String contentHash;
-
-    @Column(name = "extracted_at", nullable = false)
-    private Instant extractedAt;
+    @Column(name = "detected_at", nullable = false)
+    private Instant detectedAt;
 
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public DiscoveredUrl getDiscoveredUrl() {
@@ -69,12 +65,20 @@ public class ExtractedItem {
         this.site = site;
     }
 
-    public String getTitle() {
-        return title;
+    public String getContentHash() {
+        return contentHash;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public void setContentHash(String contentHash) {
+        this.contentHash = contentHash;
+    }
+
+    public String getPreviousHash() {
+        return previousHash;
+    }
+
+    public void setPreviousHash(String previousHash) {
+        this.previousHash = previousHash;
     }
 
     public String getProperties() {
@@ -93,20 +97,11 @@ public class ExtractedItem {
         this.rawSnapshotPath = rawSnapshotPath;
     }
 
-    public String getContentHash() {
-        return contentHash;
+    public Instant getDetectedAt() {
+        return detectedAt;
     }
 
-    public void setContentHash(String contentHash) {
-        this.contentHash = contentHash;
+    public void setDetectedAt(Instant detectedAt) {
+        this.detectedAt = detectedAt;
     }
-
-    public Instant getExtractedAt() {
-        return extractedAt;
-    }
-
-    public void setExtractedAt(Instant extractedAt) {
-        this.extractedAt = extractedAt;
-    }
-
 }
