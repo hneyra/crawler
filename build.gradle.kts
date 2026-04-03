@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.5"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.graalvm.buildtools.native") version "0.10.6"
 }
 
 group = "crawler"
@@ -65,4 +66,19 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+graalvmNative {
+    binaries {
+        named("main") {
+            imageName = "crawler"
+            buildArgs(
+                "--initialize-at-run-time=org.jsoup",
+                "--initialize-at-run-time=com.jayway.jsonpath.internal.path",
+                "-H:+AddAllCharsets",
+                "--enable-url-protocols=https,http"
+            )
+        }
+    }
+    toolchainDetection = false
 }
