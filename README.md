@@ -143,10 +143,99 @@ curl http://localhost:8080/api/stats/site/1
 curl "http://localhost:8080/api/stats/items?siteId=1&page=0&size=20"
 ```
 
+## Infraestructura (Pulumi)
+
+El directorio `infra/` contiene la definicion de infraestructura con [Pulumi](https://www.pulumi.com/) (TypeScript).
+Actualmente gestiona el rol y la base de datos PostgreSQL de la aplicacion.
+
+### Prerrequisitos
+
+- [Pulumi CLI](https://www.pulumi.com/docs/install/)
+- Node.js 18+
+- `PULUMI_ACCESS_TOKEN` configurado (`pulumi login`)
+
+### Generar passwords (obligatorio antes del primer `pulumi up`)
+
+El script `setup-passwords.ts` genera passwords aleatorios y los almacena como
+secretos cifrados en `Pulumi.<stack>.yaml`. Es **idempotente**: si los passwords
+ya existen no los sobreescribe.
+
+```bash
+cd infra
+npm install
+
+# Stack 'dev' por defecto
+npm run setup-passwords
+
+# Stack especifico
+PULUMI_STACK=prod npm run setup-passwords
+# o bien
+npx ts-node setup-passwords.ts prod
+```
+
+Luego de ejecutarlo, **hace commit del archivo generado** antes de correr `pulumi up`:
+
+```bash
+git add infra/Pulumi.*.yaml
+git commit -m "chore: update Pulumi password config"
+```
+
+> Los valores en `Pulumi.<stack>.yaml` estan cifrados con la clave del stack de
+> Pulumi — es seguro commitearlos al repositorio.
+
+### Leer passwords desde la linea de comandos
+
+```bash
+# Ver password del admin de PostgreSQL
+pulumi config get postgres:adminPassword --stack dev
+
+# Ver password del usuario de la aplicacion
+pulumi config get postgres:appPassword --stack dev
+
+# Listar toda la config del stack (secrets aparecen como [secret])
+pulumi config --stack dev
+
+# Mostrar todos los valores incluyendo secrets en texto plano
+pulumi config --stack dev --show-secrets
+```
+
+### Desplegar infraestructura
+
+```bash
+cd infra
+pulumi up --stack dev
+```
+
+### Automatizacion (GitHub Actions)
+
+El workflow `.github/workflows/pulumi-infra.yml` se dispara automaticamente
+cuando se detecta un cambio en `infra/postgres.ts` en `main`:
+
+1. **`setup-passwords`** — Ejecuta `setup-passwords.ts`, hace commit de los
+   `Pulumi.*.yaml` generados de vuelta al branch.
+2. **`pulumi-up`** — Depende de `setup-passwords`, corre `pulumi up` con la
+   config actualizada.
+
+Secrets requeridos en el repositorio:
+
+| Secret | Descripcion |
+|--------|-------------|
+| `PULUMI_ACCESS_TOKEN` | Token de acceso a Pulumi Cloud |
+| `PGHOST` | Host del servidor PostgreSQL destino |
+| `PGUSER` | Usuario admin de PostgreSQL |
+| `PGPASSWORD` | Password admin de PostgreSQL |
+| `GH_PAT` | (Opcional) PAT para que el commit del workflow dispare otros workflows |
+
 ## Estructura del Proyecto
 
 ```
 crawler/
+├── infra/                   # Pulumi infrastructure (TypeScript)
+│   ├── postgres.ts          # PostgreSQL role + database resources
+│   ├── setup-passwords.ts   # Genera passwords y los guarda en Pulumi config
+│   ├── Pulumi.yaml          # Pulumi project definition
+│   ├── Pulumi.dev.yaml      # Dev stack config (secrets cifrados)
+│   └── package.json
 ├── src/main/java/crawler/
 │   ├── config/          # Propiedades, async config, carga de YAML
 │   ├── discovery/       # Descubrimiento de URLs (Jsoup + Playwright)
