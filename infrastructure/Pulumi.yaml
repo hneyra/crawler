@@ -3,7 +3,7 @@ description: Crawler app — k3s deployment
 runtime:
   name: nodejs
   options:
-    packagemanager: npm
+    packagemanager: yarn
 config:
   # Fully-qualified name of the iaac stack that exports registryEndpoint, k3sKubeconfig,
   # and crawlerPostgresPassword — e.g. "myorg/iaac/prod"
