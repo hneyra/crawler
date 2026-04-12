@@ -1,0 +1,25 @@
+name: crawler-infra
+description: Crawler app — k3s deployment
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm
+config:
+  # Fully-qualified name of the iaac stack that exports registryEndpoint, k3sKubeconfig,
+  # and crawlerPostgresPassword — e.g. "myorg/iaac/prod"
+  crawler-infra:iaacStack:
+    default: "jneyra/iaac/prod"
+  crawler-infra:image:
+    default: crawler
+  crawler-infra:imageTag:
+    default: latest
+  crawler-infra:rendererImage:
+    default: crawler-renderer
+  crawler-infra:rendererImageTag:
+    default: latest
+  crawler-infra:namespace:
+    default: crawler
+  crawler-infra:replicas:
+    default: "1"
+  crawler-infra:host:
+    default: ""

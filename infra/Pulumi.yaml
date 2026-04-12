@@ -1,3 +1,0 @@
-name: crawler-infra
-runtime: nodejs
-description: Crawler infrastructure - PostgreSQL provisioning

@@ -9,5 +9,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "files": ["postgres.ts", "setup-passwords.ts"]
+  "include": ["index.ts", "src/**/*.ts"]
 }
