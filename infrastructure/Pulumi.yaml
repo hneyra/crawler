@@ -1,0 +1,3 @@
+name: crawler
+runtime: nodejs
+description: Crawler Docker deployment (app + renderer + postgres) managed by Pulumi

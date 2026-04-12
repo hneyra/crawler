@@ -1,0 +1,17 @@
+{
+  "name": "crawler-infrastructure",
+  "version": "1.0.0",
+  "description": "Pulumi infrastructure for crawler Docker deployment",
+  "main": "bin/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/docker": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

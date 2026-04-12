@@ -1,0 +1,15 @@
+# Stack config for the 'prod' environment.
+#
+# Values set here are safe to commit (no secrets, no IPs).
+# Dynamic values are injected by CI on every run:
+#   pulumi config set docker:host   "ssh://USER@HOST"   --stack prod
+#   pulumi config set crawler:imageTag   "SHORT_SHA"    --stack prod
+#   pulumi config set crawler:repoOwner  "ORG_OR_USER"  --stack prod
+#
+# One-time manual bootstrap (run locally before first deploy):
+#   cd infrastructure
+#   pulumi stack init prod           # or: pulumi stack select prod
+#   pulumi config set --secret crawler:dbPassword "YOUR_SECURE_PASSWORD"
+#
+config:
+  crawler:registryServer: ghcr.io
