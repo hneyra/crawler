@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "cost-optimization": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "c4322ff908501140bd9c5acf762736391717913ebc24077fd5a3d82ffb4003de"
+    },
+    "github-actions-templates": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "8604814828637308a8cdc45c53e647f0029395328184937312330e4b8e8c587f"
+    },
+    "gitops-workflow": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "e8df22024090440fce624e6a99faca4b66aa267a428b5a63a0c0416fa4eb2629"
+    },
+    "kubernetes-specialist": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "a0db55b61dd95ad2ad33b1bde2608d63d287f379a7bb4c9d7237ac3a79f71a70"
+    },
+    "pulumi-best-practices": {
+      "source": "pulumi/agent-skills",
+      "sourceType": "github",
+      "computedHash": "cbbaa9f2a7b3a52eb5ed0e0c60e50b4440ed884113dc919bb83c0a5723cd487f"
+    },
+    "pulumi-esc": {
+      "source": "pulumi/agent-skills",
+      "sourceType": "github",
+      "computedHash": "0476a30cbf9595b1011eb1a5ae4e7bae99c0a2a3bcb15eed1626f4deaaf38a3f"
+    },
+    "pulumi-typescript": {
+      "source": "dirien/claude-skills",
+      "sourceType": "github",
+      "computedHash": "84d028aab162d00e16fb101bf4c7d51de5d1206c15e556fdbcc610b422967493"
+    }
+  }
+}
