@@ -34,7 +34,8 @@ JPA entities, enums, and Spring Data repositories. Defines the persistence layer
 
 | Class | Description |
 |-------|-------------|
-| `ExtractionConfig` | Not an entity — embedded as JSONB in `Site`. Fields: detailStrategy, fieldSelectors (Map), scriptPatterns (List), jsonPaths (Map), interceptPatterns (List) |
+| `ExtractionConfig` | Not an entity — embedded as JSONB in `Site`. Fields: detailStrategy, fieldSelectors (Map), scriptPatterns (List), jsonPaths (Map), interceptPatterns (List), listFieldSelectors (Map), regexFields (Map), labelValueBlocks (List\<LabelValueBlockConfig\>) |
+| `LabelValueBlockConfig` | Not an entity — element of `ExtractionConfig.labelValueBlocks`. Fields: containerSelector, itemSelector, labelSelector, valueSelector, targetKey. Describes a repeated label+value spec block to scrape into a nested map (see `crawler.extraction` CLAUDE.md) |
 
 ## Important Details
 

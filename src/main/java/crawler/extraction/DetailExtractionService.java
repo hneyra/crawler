@@ -16,6 +16,7 @@ import crawler.model.DiscoveredUrlRepository;
 import crawler.model.ExtractedItem;
 import crawler.model.ExtractedItemRepository;
 import crawler.model.ExtractionConfig;
+import crawler.model.LabelValueBlockConfig;
 import crawler.model.Site;
 import crawler.model.SiteRepository;
 import crawler.model.UrlStatus;
@@ -24,9 +25,12 @@ import crawler.support.PageFetcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.text.Normalizer;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -179,12 +183,15 @@ public class DetailExtractionService {
 
             if (strategy == DetailStrategy.HTML || strategy == null) {
                 extractFromHtml(doc, config.getFieldSelectors(), properties);
+                extractListFields(doc, config.getListFieldSelectors(), properties);
+                extractLabelValueBlocks(doc, config.getLabelValueBlocks(), properties);
             }
 
             if (strategy == DetailStrategy.SCRIPT_JSON || strategy == null) {
                 extractFromScripts(doc, config, properties);
             }
 
+            extractRegexFields(html, config.getRegexFields(), properties);
             extractJsonLd(doc, config, properties);
         }
 
@@ -216,6 +223,9 @@ public class DetailExtractionService {
         if (config.getFieldSelectors() != null && !config.getFieldSelectors().isEmpty()) {
             extractFromHtml(doc, config.getFieldSelectors(), properties);
         }
+        extractListFields(doc, config.getListFieldSelectors(), properties);
+        extractLabelValueBlocks(doc, config.getLabelValueBlocks(), properties);
+        extractRegexFields(html, config.getRegexFields(), properties);
 
         // Extract from intercepted JSON responses via JsonPath
         for (InterceptedResponse intercepted : response.interceptedResponses()) {
@@ -261,10 +271,103 @@ public class DetailExtractionService {
             return;
         }
         for (Map.Entry<String, String> entry : fieldSelectors.entrySet()) {
-            Element el = doc.selectFirst(entry.getValue());
+            SelectorSpec spec = SelectorSpec.parse(entry.getValue());
+            Element el = doc.selectFirst(spec.selector());
             if (el != null) {
-                properties.put(entry.getKey(), el.text());
+                String value = spec.attr() != null ? el.attr(spec.attr()) : el.text();
+                if (!value.isBlank()) {
+                    properties.put(entry.getKey(), value);
+                }
             }
+        }
+    }
+
+    private void extractListFields(Document doc, Map<String, String> listFieldSelectors,
+                                   Map<String, Object> properties) {
+        if (listFieldSelectors == null || listFieldSelectors.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : listFieldSelectors.entrySet()) {
+            SelectorSpec spec = SelectorSpec.parse(entry.getValue());
+            Elements elements = doc.select(spec.selector());
+            List<String> values = new ArrayList<>();
+            for (Element el : elements) {
+                String value = spec.attr() != null ? el.attr(spec.attr()) : el.text();
+                if (!value.isBlank()) {
+                    values.add(value);
+                }
+            }
+            if (!values.isEmpty()) {
+                properties.put(entry.getKey(), values);
+            }
+        }
+    }
+
+    private void extractRegexFields(String html, Map<String, String> regexFields,
+                                    Map<String, Object> properties) {
+        if (regexFields == null || regexFields.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : regexFields.entrySet()) {
+            try {
+                Matcher matcher = Pattern.compile(entry.getValue()).matcher(html);
+                if (matcher.find()) {
+                    String value = matcher.groupCount() > 0 ? matcher.group(1) : matcher.group();
+                    if (value != null && !value.isBlank()) {
+                        properties.put(entry.getKey(), value.trim());
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Regex field error for '{}': {}", entry.getKey(), e.getMessage());
+            }
+        }
+    }
+
+    private void extractLabelValueBlocks(Document doc, List<LabelValueBlockConfig> blocks,
+                                         Map<String, Object> properties) {
+        if (blocks == null || blocks.isEmpty()) {
+            return;
+        }
+        for (LabelValueBlockConfig block : blocks) {
+            Map<String, String> values = new LinkedHashMap<>();
+            Elements containers = doc.select(block.getContainerSelector());
+            for (Element container : containers) {
+                Elements items = container.select(block.getItemSelector());
+                for (Element item : items) {
+                    Element labelEl = item.selectFirst(block.getLabelSelector());
+                    Element valueEl = item.selectFirst(block.getValueSelector());
+                    if (labelEl == null || valueEl == null) {
+                        continue;
+                    }
+                    String key = normalizeKey(labelEl.text());
+                    if (!key.isBlank()) {
+                        values.put(key, valueEl.text());
+                    }
+                }
+            }
+            if (!values.isEmpty()) {
+                properties.put(block.getTargetKey(), values);
+            }
+        }
+    }
+
+    private static String normalizeKey(String label) {
+        String withoutAccents = Normalizer.normalize(label, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return withoutAccents.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+    }
+
+    private static final Pattern ATTR_SELECTOR = Pattern.compile("^(.*)::attr\\(([^)]+)\\)$");
+
+    private record SelectorSpec(String selector, String attr) {
+        static SelectorSpec parse(String rawSelector) {
+            Matcher matcher = ATTR_SELECTOR.matcher(rawSelector.trim());
+            if (matcher.matches()) {
+                return new SelectorSpec(matcher.group(1).trim(), matcher.group(2).trim());
+            }
+            return new SelectorSpec(rawSelector, null);
         }
     }
 

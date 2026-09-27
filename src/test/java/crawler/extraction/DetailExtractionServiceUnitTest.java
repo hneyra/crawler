@@ -260,6 +260,240 @@ class DetailExtractionServiceUnitTest {
     }
 
     // -------------------------------------------------------------------------
+    // processBatch – HTML strategy extension: attributes, lists, regex, label/value blocks
+    // -------------------------------------------------------------------------
+
+    @Test
+    void processBatch_extractsAttributeSelectorFromHtml() throws Exception {
+        ExtractionConfig config = new ExtractionConfig();
+        config.setDetailStrategy(DetailStrategy.HTML);
+        config.setFieldSelectors(Map.of("coverImage", "meta[property=og:image]::attr(content)"));
+
+        Site site = buildSite(1L, config);
+        DiscoveredUrl url = buildDiscoveredUrl(site, "https://example.com/product/1");
+
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(site));
+        when(crawlerProperties.getExtractionBatchSize()).thenReturn(10);
+        when(discoveredUrlRepository.findByCategory_Site_IdAndStatus(any(), any(), any()))
+                .thenReturn(List.of(url));
+        when(pageFetcher.fetch(any())).thenReturn(org.jsoup.Jsoup.parse(
+                "<html><head><meta property=\"og:image\" content=\"https://img.example.com/cover.jpg\">"
+                        + "</head><body></body></html>", url.getUrl()));
+        when(rawStorageService.saveHtml(any(), any(), any())).thenReturn("1/2024-01-01/abc.html");
+
+        service.processBatch(1L);
+
+        ArgumentCaptor<crawler.model.ExtractedItem> itemCaptor =
+                ArgumentCaptor.forClass(crawler.model.ExtractedItem.class);
+        verify(extractedItemRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getProperties())
+                .contains("https://img.example.com/cover.jpg");
+    }
+
+    @Test
+    void processBatch_extractsListFieldSelectors() throws Exception {
+        ExtractionConfig config = new ExtractionConfig();
+        config.setDetailStrategy(DetailStrategy.HTML);
+        config.setListFieldSelectors(Map.of("images", ".sp-slide img::attr(data-src)"));
+
+        Site site = buildSite(1L, config);
+        DiscoveredUrl url = buildDiscoveredUrl(site, "https://example.com/product/1");
+
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(site));
+        when(crawlerProperties.getExtractionBatchSize()).thenReturn(10);
+        when(discoveredUrlRepository.findByCategory_Site_IdAndStatus(any(), any(), any()))
+                .thenReturn(List.of(url));
+        when(pageFetcher.fetch(any())).thenReturn(org.jsoup.Jsoup.parse(
+                "<html><body>"
+                        + "<div class='sp-slide'><img data-src='https://img.example.com/1.jpg'></div>"
+                        + "<div class='sp-slide'><img data-src='https://img.example.com/2.jpg'></div>"
+                        + "</body></html>", url.getUrl()));
+        when(rawStorageService.saveHtml(any(), any(), any())).thenReturn("1/2024-01-01/abc.html");
+
+        service.processBatch(1L);
+
+        ArgumentCaptor<crawler.model.ExtractedItem> itemCaptor =
+                ArgumentCaptor.forClass(crawler.model.ExtractedItem.class);
+        verify(extractedItemRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getProperties())
+                .contains("https://img.example.com/1.jpg")
+                .contains("https://img.example.com/2.jpg");
+    }
+
+    @Test
+    void processBatch_extractsRegexFields() throws Exception {
+        ExtractionConfig config = new ExtractionConfig();
+        config.setDetailStrategy(DetailStrategy.HTML);
+        config.setRegexFields(Map.of(
+                "latitude", "setView\\(\\[(-?[0-9.]+),\\s*-?[0-9.]+\\]",
+                "longitude", "setView\\(\\[-?[0-9.]+,\\s*(-?[0-9.]+)\\]"));
+
+        Site site = buildSite(1L, config);
+        DiscoveredUrl url = buildDiscoveredUrl(site, "https://example.com/product/1");
+
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(site));
+        when(crawlerProperties.getExtractionBatchSize()).thenReturn(10);
+        when(discoveredUrlRepository.findByCategory_Site_IdAndStatus(any(), any(), any()))
+                .thenReturn(List.of(url));
+        when(pageFetcher.fetch(any())).thenReturn(org.jsoup.Jsoup.parse(
+                "<html><body><script>var map = L.map('m').setView([-12.19984, -77.01840], 14);"
+                        + "</script></body></html>", url.getUrl()));
+        when(rawStorageService.saveHtml(any(), any(), any())).thenReturn("1/2024-01-01/abc.html");
+
+        service.processBatch(1L);
+
+        ArgumentCaptor<crawler.model.ExtractedItem> itemCaptor =
+                ArgumentCaptor.forClass(crawler.model.ExtractedItem.class);
+        verify(extractedItemRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getProperties())
+                .contains("-12.19984")
+                .contains("-77.01840");
+    }
+
+    @Test
+    void processBatch_extractsLabelValueBlocksWithNormalizedKeys() throws Exception {
+        crawler.model.LabelValueBlockConfig block = new crawler.model.LabelValueBlockConfig();
+        block.setContainerSelector("#specs");
+        block.setItemSelector(".col-6");
+        block.setLabelSelector("label");
+        block.setValueSelector("p");
+        block.setTargetKey("specs");
+
+        ExtractionConfig config = new ExtractionConfig();
+        config.setDetailStrategy(DetailStrategy.HTML);
+        config.setLabelValueBlocks(List.of(block));
+
+        Site site = buildSite(1L, config);
+        DiscoveredUrl url = buildDiscoveredUrl(site, "https://example.com/product/1");
+
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(site));
+        when(crawlerProperties.getExtractionBatchSize()).thenReturn(10);
+        when(discoveredUrlRepository.findByCategory_Site_IdAndStatus(any(), any(), any()))
+                .thenReturn(List.of(url));
+        when(pageFetcher.fetch(any())).thenReturn(org.jsoup.Jsoup.parse(
+                "<html><body><div id='specs'>"
+                        + "<div class='col-6'><label>Área Terreno</label><p>625.00 m2</p></div>"
+                        + "<div class='col-6'><label>N° de Pisos</label><p>0</p></div>"
+                        + "</div></body></html>", url.getUrl()));
+        when(rawStorageService.saveHtml(any(), any(), any())).thenReturn("1/2024-01-01/abc.html");
+
+        service.processBatch(1L);
+
+        ArgumentCaptor<crawler.model.ExtractedItem> itemCaptor =
+                ArgumentCaptor.forClass(crawler.model.ExtractedItem.class);
+        verify(extractedItemRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getProperties())
+                .contains("\"area_terreno\":\"625.00 m2\"")
+                .contains("\"n_de_pisos\":\"0\"");
+    }
+
+    // -------------------------------------------------------------------------
+    // processBatch – full REMAX detail page fixture (mirrors sites-config.yml)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void processBatch_extractsRemaxPropertyFixture() throws Exception {
+        ExtractionConfig config = new ExtractionConfig();
+        config.setDetailStrategy(DetailStrategy.HTML);
+        config.setFieldSelectors(Map.of(
+                "title", ".titulo_01 h1",
+                "propertyType", ".status_float .badge-blue",
+                "location", ".titulo_07 h5",
+                "coverImage", "meta[property=og:image]::attr(content)"));
+        config.setListFieldSelectors(Map.of("images", ".sp-slide img::attr(data-src)"));
+        config.setRegexFields(Map.of(
+                "externalId", "ID:\\s*(\\d+)",
+                "priceSoles", "S/\\.\\s*([\\d,\\.']+)",
+                "priceUsd", "USD\\s*([\\d,\\.']+)",
+                "agentPhone", "href=\"tel:(\\d+)\"",
+                "latitude", "setView\\(\\[(-?[0-9.]+),\\s*-?[0-9.]+\\]",
+                "longitude", "setView\\(\\[-?[0-9.]+,\\s*(-?[0-9.]+)\\]",
+                "publishedDate", "Publicada\\s*:\\s*([^<]+)<br"));
+        crawler.model.LabelValueBlockConfig block = new crawler.model.LabelValueBlockConfig();
+        block.setContainerSelector("#collapse_2, #collapse_3");
+        block.setItemSelector(".col-6");
+        block.setLabelSelector("label.__bodyt");
+        block.setValueSelector("p.__bodyc");
+        block.setTargetKey("specs");
+        config.setLabelValueBlocks(List.of(block));
+
+        Site site = buildSite(1L, config);
+        DiscoveredUrl url = buildDiscoveredUrl(site,
+                "https://www.remax.pe/web/search/property/propiedad-terreno-en-venta-1187626/");
+
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(site));
+        when(crawlerProperties.getExtractionBatchSize()).thenReturn(10);
+        when(discoveredUrlRepository.findByCategory_Site_IdAndStatus(any(), any(), any()))
+                .thenReturn(List.of(url));
+        when(pageFetcher.fetch(any())).thenReturn(org.jsoup.Jsoup.parse(REMAX_FIXTURE_HTML, url.getUrl()));
+        when(rawStorageService.saveHtml(any(), any(), any())).thenReturn("1/2024-01-01/abc.html");
+
+        service.processBatch(1L);
+
+        ArgumentCaptor<crawler.model.ExtractedItem> itemCaptor =
+                ArgumentCaptor.forClass(crawler.model.ExtractedItem.class);
+        verify(extractedItemRepository).save(itemCaptor.capture());
+        String properties = itemCaptor.getValue().getProperties();
+
+        assertThat(properties)
+                .contains("Venta De Terreno En Zona De Cedros De Villa")
+                .contains("TERRENO URBANO EN VENTA")
+                .contains("Lima, Lima, Chorrillos")
+                .contains("\"externalId\":\"1187626\"")
+                .contains("\"priceSoles\":\"1'690,000.00\"")
+                .contains("\"priceUsd\":\"500,000.00\"")
+                .contains("\"agentPhone\":\"965098513\"")
+                .contains("-12.199848642988874")
+                .contains("-77.01840437589111")
+                .contains("26 de Junio de 2026")
+                .contains("cover_1187626.jpg")
+                .contains("8e6be013-9ec3-4d72-b860-e735ef254.jpg")
+                .contains("\"area_terreno\":\"625.00 m2\"")
+                .contains("\"medidas\":\"7.42 X 36.08\"")
+                .contains("\"servicio_de_gas\":\"Cálidda\"");
+        assertThat(itemCaptor.getValue().getTitle())
+                .isEqualTo("Venta De Terreno En Zona De Cedros De Villa");
+    }
+
+    private static final String REMAX_FIXTURE_HTML = """
+            <html><head>
+            <meta property="og:image" content="https://sfo3.digitaloceanspaces.com/media-remax-peru/media/public/photos/propertys/1187626/cover_1187626.jpg">
+            </head><body>
+            <div class="__slider">
+              <div class="sp-slides">
+                <div class="sp-slide"><img data-src="https://sfo3.digitaloceanspaces.com/media-remax-peru/media/public/photos/propertys/1187626/cover_1187626.jpg"/></div>
+                <div class="sp-slide"><img data-src="https://sfo3.digitaloceanspaces.com/media-remax-peru/media/public/photos/propertys/1187626/8e6be013-9ec3-4d72-b860-e735ef254.jpg?X-Amz-Signature=abc"/></div>
+              </div>
+            </div>
+            <div class="status_float">
+              <span class="badge badge-pill base-badge badge-blue">TERRENO URBANO EN VENTA</span>
+              <span class="badge badge-pill base-badge badge-danger">ID: 1187626</span>
+            </div>
+            <div class="titulo_07"><h5><i class="fas fa-map-marker-alt"></i>&nbsp;&nbsp;Lima, Lima, Chorrillos</h5></div>
+            <div class="titulo_01"><h1>Venta De Terreno En Zona De Cedros De Villa</h1></div>
+            <div class="titulo_04"><ul><li>S/. 1'690,000.00</li><li>-</li><li>USD 500,000.00</li></ul></div>
+            <div id="collapse_2">
+              <div class="col-6 col-md-4"><label class="__bodyt">Área Terreno</label><p class="__bodyc">625.00 m2</p></div>
+              <div class="col-6 col-md-4"><label class="__bodyt">Área Construida</label><p class="__bodyc">0.00 m²</p></div>
+              <div class="col-6 col-md-4"><label class="__bodyt">Medidas</label><p class="__bodyc">7.42 X 36.08</p></div>
+            </div>
+            <div id="collapse_3">
+              <div class="col-6 col-md-3"><label class="__bodyt">Antigüedad</label><p class="__bodyc">0 Años</p></div>
+              <div class="col-6 col-md-3"><label class="__bodyt">Servicio de Gas</label><p class="__bodyc">Cálidda</p></div>
+            </div>
+            <div class="__agenteintpro">
+              <h2>Rodolfo Tito Flores</h2>
+              <h4>REMAX ABITARE</h4>
+              <a href="tel:965098513" class="contact-images" title="Llamar"></a>
+            </div>
+            <script>
+              var content = '<p>Publicada : 26 de Junio de 2026<br><br>';
+              var map = L.map('map_property').setView([-12.199848642988874, -77.01840437589111], 14);
+            </script>
+            </body></html>
+            """;
+
+    // -------------------------------------------------------------------------
     // helpers
     // -------------------------------------------------------------------------
 

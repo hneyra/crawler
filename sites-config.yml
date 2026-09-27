@@ -43,3 +43,40 @@ sites:
         linkExtractionType: DATA_ATTRIBUTE
         linkAttribute: data-to-posting
         enabled: true
+
+  - name: REMAX Perú
+    baseUrl: https://www.remax.pe
+    enabled: true
+    politenessDelayMs: 1500
+    extractionConfig:
+      detailStrategy: HTML
+      fieldSelectors:
+        title: ".titulo_01 h1"
+        propertyType: ".status_float .badge-blue"
+        location: ".titulo_07 h5"
+        description: ".__text_match"
+        priceRaw: ".titulo_04"
+        coverImage: "meta[property=og:image]::attr(content)"
+        agentName: ".__agenteintpro h2"
+        agentOffice: ".__agenteintpro h4"
+      listFieldSelectors:
+        images: ".sp-slide img::attr(data-src)"
+      regexFields:
+        externalId: "ID:\\s*(\\d+)"
+        priceSoles: "S/\\.\\s*([\\d,\\.']+)"
+        priceUsd: "USD\\s*([\\d,\\.']+)"
+        agentPhone: "href=\"tel:(\\d+)\""
+        latitude: "setView\\(\\[(-?[0-9.]+),\\s*-?[0-9.]+\\]"
+        longitude: "setView\\(\\[-?[0-9.]+,\\s*(-?[0-9.]+)\\]"
+        publishedDate: "Publicada\\s*:\\s*([^<]+)<br"
+      labelValueBlocks:
+        - containerSelector: "#collapse_2, #collapse_3"
+          itemSelector: ".col-6"
+          labelSelector: "label.__bodyt"
+          valueSelector: "p.__bodyc"
+          targetKey: specs
+    # NOTA: no se configuran categorías (páginas de listado) todavia porque
+    # no se dispone del HTML real de una página de búsqueda/listado de REMAX.
+    # Los selectores de descubrimiento (itemLinkSelector, paginationType, etc.)
+    # deben definirse a partir de esa página para evitar selectores adivinados.
+    categories: []
